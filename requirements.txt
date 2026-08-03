@@ -2,3 +2,5 @@ opencv-python>=4.8.0
 torch>=2.0.0
 numpy>=1.26.0
 openai-whisper>=20231117
+colorlog>=6.8.0
+pydantic>=2.5.0
