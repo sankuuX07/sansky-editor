@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sansky-ai-editor"
+version = "0.1.0"
+description = "AI-powered desktop application that automates repetitive gaming video editing tasks while integrating with Adobe Premiere Pro."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "opencv-python>=4.8.0",
+    "torch>=2.0.0",
+    "numpy>=1.26.0",
+    "openai-whisper>=20231117"
+]
