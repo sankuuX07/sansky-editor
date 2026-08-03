@@ -60,11 +60,15 @@ class TaskManager:
         while self._running:
             p_task = await self._queue.get()
             if p_task.task_id == "STOP":
+                if hasattr(p_task.coro, "close"):
+                    p_task.coro.close()
                 self._queue.task_done()
                 break
 
             task_id = p_task.task_id
             if self._progress[task_id].state == TaskState.CANCELLED:
+                if hasattr(p_task.coro, "close"):
+                    p_task.coro.close()
                 self._queue.task_done()
                 continue
 
@@ -107,10 +111,14 @@ class TaskManager:
 
     def submit_blocking(self, func: Callable, *args: Any, priority: int = 10, **kwargs: Any) -> str:
         """Submit a blocking function to run in the default executor."""
+        import functools
         task_id = str(uuid.uuid4())
-        loop = asyncio.get_running_loop()
-        coro = loop.run_in_executor(None, func, *args, **kwargs)
-        return self.submit_coroutine(coro, priority=priority, task_id=task_id)
+        
+        async def _wrapper():
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
+            
+        return self.submit_coroutine(_wrapper(), priority=priority, task_id=task_id)
 
     def cancel_task(self, task_id: str) -> bool:
         """Attempt to cancel a task."""

@@ -14,6 +14,8 @@ class BaseEngine(ABC):
         self.name = name
         self.logger = logging.getLogger(f"engine.{self.name}")
         self._status: EngineStatus = EngineStatus.UNINITIALIZED
+        self.is_initialized = False
+        self.is_running = False
 
     @abstractmethod
     def initialize(self) -> None:
