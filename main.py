@@ -1,54 +1,42 @@
-"""
-Sansky AI Editor - Main Entry Point
-"""
-
 import sys
+from pathlib import Path
+
+from PySide6.QtWidgets import QApplication
+
 import logging
-import asyncio
-from app.bootstrap.bootstrapper import ApplicationBootstrapper
-from core.dependency_injection.container import container
-from app.scheduler.task_manager import TaskManager
+logging.basicConfig(level=logging.INFO)
 
-logger = logging.getLogger(__name__)
+from ui.main_window import MainWindow
+from app.services.backend_service import BackendService
 
-async def async_main() -> None:
-    """Async main loop for managing the task manager and background workers."""
-    try:
-        # Initialize the core application framework
-        ApplicationBootstrapper.bootstrap()
-        
-        # Start TaskManager background workers
-        task_manager = container.resolve(TaskManager)
-        task_manager.start_workers()
-        
-        logger.info("Application running. Press Ctrl+C to stop.")
-        while True:
-            await asyncio.sleep(1)
-            
-    except asyncio.CancelledError:
-        logger.info("Main loop cancelled.")
-    except Exception as e:
-        logger.critical(f"Application crashed: {e}", exc_info=True)
+def main():
+    # 1. Start the Backend Service thread
+    backend = BackendService()
+    backend.start()
+    
+    # Wait for the async loop and managers to initialize safely
+    if not backend.wait_until_ready(timeout=10.0):
+        logging.error("Backend Service failed to initialize in time. Exiting.")
         sys.exit(1)
-    finally:
-        # Stop background workers gracefully
-        try:
-            task_manager = container.resolve(TaskManager)
-            await task_manager.stop_workers()
-        except KeyError:
-            pass
         
-        # Gracefully shutdown resources and engines
-        ApplicationBootstrapper.shutdown()
-
-def main() -> None:
-    """
-    Main entry point for the Sansky AI Editor application.
-    """
-    try:
-        asyncio.run(async_main())
-    except KeyboardInterrupt:
-        logger.info("Keyboard interrupt received. Shutting down...")
+    # 2. Initialize GUI
+    app = QApplication(sys.argv)
+    
+    style_path = Path(__file__).parent / "ui" / "resources" / "styles" / "style.qss"
+    if style_path.exists():
+        with open(style_path, "r") as f:
+            app.setStyleSheet(f.read())
+            
+    # Provide the initialized shorts_generator and the background loop to the GUI
+    window = MainWindow(backend.shorts_generator, backend.loop)
+    window.show()
+    
+    exit_code = app.exec()
+    
+    # 3. Teardown Backend safely
+    backend.shutdown()
+    
+    sys.exit(exit_code)
 
 if __name__ == "__main__":
     main()

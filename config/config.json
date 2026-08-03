@@ -1,0 +1,7 @@
+{
+    "log_level": "INFO",
+    "data_dir": "data",
+    "output_dir": "data/output",
+    "whisper_model_size": "base",
+    "ffmpeg_path": null
+}

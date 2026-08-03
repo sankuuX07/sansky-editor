@@ -1,37 +1,49 @@
 # Sansky AI Editor
 
-Production-quality AI-powered desktop application that automates repetitive gaming video editing tasks while integrating with Adobe Premiere Pro.
+Sansky AI Editor is a production-grade desktop application that fully automates the creation of professional gaming Highlights and YouTube Shorts, directly integrating with Adobe Premiere Pro.
 
-## Features (Planned)
-- Automate gaming video editing.
-- Detect highlights.
-- Generate subtitles locally.
-- Prepare Premiere Pro timelines.
-- Export optimized Shorts.
+## Features
+- **Video Processing Engine**: Extracts audio streams and visual characteristics from massive raw gameplay files.
+- **Whisper Speech Intelligence Engine**: Generates highly accurate raw speech transcription from gaming audio.
+- **Caption Engine**: Transforms raw text into visually stunning, stylized subtitling metadata.
+- **Highlight Detection Engine**: Programmatically scrubs hours of footage to select the most engaging, action-packed moments.
+- **Premiere Automation Engine**: Bridges python logic directly to Adobe Premiere Pro.
+- **One-Click Shorts Generator**: The flagship orchestrator that triggers all systems above via an asynchronous DAG.
 
-## Tech Stack
-- **Language**: Python 3.12+
-- **Video Processing**: FFmpeg
-- **Computer Vision**: OpenCV
-- **Speech Recognition**: OpenAI Whisper (Local)
-- **Machine Learning**: PyTorch, NumPy
-- **Editing**: Adobe Premiere Pro
+## Quickstart
+
+```python
+import asyncio
+from pathlib import Path
+
+from app.services.engine_manager import EngineManager
+from app.scheduler.task_manager import TaskManager
+from engines.automation_engine.automation_engine import AutomationEngine
+from engines.shorts_generator_engine.shorts_generator_engine import ShortsGeneratorEngine
+
+# Initialize core architecture
+engine_manager = EngineManager()
+task_manager = TaskManager(max_workers=4)
+task_manager.start_workers()
+
+automation = AutomationEngine(engine_manager, task_manager)
+engine_manager.register(automation)
+
+shorts_generator = ShortsGeneratorEngine(automation)
+engine_manager.register(shorts_generator)
+
+# Start all subsystems
+engine_manager.initialize_all()
+engine_manager.start_all()
+
+# Generate a YouTube Short
+async def run():
+    video = Path("./raw_footage/gameplay_01.mp4")
+    result = await shorts_generator.generate_shorts([video])
+    print(f"Generated Project: {result.projects[0].premiere_project_path}")
+
+asyncio.run(run())
+```
 
 ## Architecture
-This project follows SOLID principles, single responsibility, and composition over inheritance. 
-- `app/`: High-level application logic (bootstrap, workflows, etc.).
-- `core/`: Core infrastructure (config, DI, logger, events).
-- `engines/`: Specific independent subsystems (video, ai, captions, premiere).
-- `data/` and `assets/`: File and media storage.
-
-## Development
-
-Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-Run the application:
-```bash
-python main.py
-```
+The application is strictly designed following SOLID principles and utilizes Dependency Injection to isolate engines. An overarching `EngineManager` acts as the DI Container, while the `AutomationEngine` manages parallel `TaskManager` queues to process complex computational graphs.
