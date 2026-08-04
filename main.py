@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication
 import logging
 logging.basicConfig(level=logging.INFO)
 
-from ui.main_window import MainWindow
+from ui.main_window.main_window import MainWindow
 from app.services.backend_service import BackendService
 
 def main():
@@ -22,7 +22,7 @@ def main():
     # 2. Initialize GUI
     app = QApplication(sys.argv)
     
-    style_path = Path(__file__).parent / "ui" / "resources" / "styles" / "style.qss"
+    style_path = Path(__file__).parent / "ui" / "styles" / "dark_theme.qss"
     if style_path.exists():
         with open(style_path, "r") as f:
             app.setStyleSheet(f.read())

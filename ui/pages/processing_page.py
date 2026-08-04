@@ -1,31 +1,37 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar, QTextEdit
+from PySide6.QtWidgets import QLabel, QProgressBar, QVBoxLayout, QWidget, QListWidget
+from ui.pages.base_page import BasePage
 
-class ProcessingPage(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout(self)
+class ProcessingPage(BasePage):
+    def __init__(self, parent=None):
+        super().__init__("Processing Workflow", parent)
         
-        title = QLabel("Processing Workflow")
-        title.setObjectName("H1")
+        card = QWidget()
+        card.setProperty("class", "Card")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(24, 24, 24, 24)
+        card_layout.setSpacing(16)
         
-        self.status_lbl = QLabel("Awaiting tasks...")
-        self.status_lbl.setObjectName("H2")
+        self.status_lbl = QLabel("Idle")
+        self.status_lbl.setProperty("class", "Header2")
+        card_layout.addWidget(self.status_lbl)
         
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFixedHeight(30)
+        self.progress_bar.setFixedHeight(8)
+        card_layout.addWidget(self.progress_bar)
         
-        self.log_view = QTextEdit()
-        self.log_view.setReadOnly(True)
-        self.log_view.setStyleSheet("background-color: #121212; border: 1px solid #333; font-family: Consolas, monospace;")
+        self.timeline_list = QListWidget()
+        self.timeline_list.setProperty("class", "Timeline")
+        self.timeline_list.setStyleSheet("background: transparent; border: none;")
+        self.timeline_list.setSelectionMode(QListWidget.NoSelection)
+        card_layout.addWidget(self.timeline_list)
         
-        layout.addWidget(title)
-        layout.addWidget(self.status_lbl)
-        layout.addWidget(self.progress_bar)
-        layout.addWidget(self.log_view)
+        self.content_layout.addWidget(card)
         
-    def update_progress(self, message: str, percentage: int):
-        self.status_lbl.setText(message)
-        self.progress_bar.setValue(percentage)
-        self.log_view.append(f"> {message}")
+    def update_progress(self, msg, pct):
+        self.status_lbl.setText(f"Task: {msg}")
+        self.progress_bar.setValue(pct)
+        if pct < 100 and msg != "Idle":
+            self.timeline_list.addItem(f"• {msg} ({pct}%)")
+            self.timeline_list.scrollToBottom()

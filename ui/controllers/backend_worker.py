@@ -1,8 +1,6 @@
 from PySide6.QtCore import QThread, Signal
 import asyncio
 import logging
-from core.models.shorts_models import OutputSettings
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +9,7 @@ class ShortsGenerationWorker(QThread):
     generation_completed = Signal(object) # result object
     generation_failed = Signal(str) # error message
 
-    def __init__(self, shorts_engine, video_paths, settings: OutputSettings, backend_loop):
+    def __init__(self, shorts_engine, video_paths, settings, backend_loop):
         super().__init__()
         self.shorts_engine = shorts_engine
         self.video_paths = video_paths

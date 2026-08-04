@@ -1,61 +1,27 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog, QHBoxLayout
-from PySide6.QtCore import Signal
-from pathlib import Path
+from PySide6.QtWidgets import QLabel, QPushButton, QHBoxLayout, QWidget
+from ui.pages.base_page import BasePage
 
-class DashboardPage(QWidget):
-    generate_requested = Signal(list, str) # video_paths, output_dir
-
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout(self)
+class DashboardPage(BasePage):
+    def __init__(self, parent=None):
+        super().__init__("Dashboard", parent)
         
-        title = QLabel("Dashboard")
-        title.setObjectName("H1")
-        layout.addWidget(title)
+        welcome_lbl = QLabel("Welcome back to Sansky AI Editor Pro.")
+        welcome_lbl.setProperty("class", "Subtitle")
+        self.content_layout.addWidget(welcome_lbl)
         
-        self.video_paths = []
-        self.output_dir = str(Path.home() / "Videos" / "SanskyOutputs")
+        card = QWidget()
+        card.setProperty("class", "Card")
+        card_layout = QHBoxLayout(card)
+        card_layout.setContentsMargins(24, 24, 24, 24)
         
-        # Select Video
-        self.lbl_video = QLabel("No video selected")
-        btn_select_video = QPushButton("Select Gameplay Video")
-        btn_select_video.setObjectName("SecondaryButton")
-        btn_select_video.clicked.connect(self._select_video)
+        self.start_btn = QPushButton("New Project")
+        self.start_btn.setProperty("class", "PrimaryButton")
         
-        # Select Output
-        self.lbl_output = QLabel(f"Output: {self.output_dir}")
-        btn_select_output = QPushButton("Select Output Folder")
-        btn_select_output.setObjectName("SecondaryButton")
-        btn_select_output.clicked.connect(self._select_output)
+        settings_btn = QPushButton("Quick Settings")
+        settings_btn.setProperty("class", "SecondaryButton")
         
-        # Generate Button
-        btn_generate = QPushButton("Generate Shorts")
-        btn_generate.setFixedHeight(50)
-        btn_generate.clicked.connect(self._on_generate)
+        card_layout.addWidget(self.start_btn)
+        card_layout.addWidget(settings_btn)
+        card_layout.addStretch()
         
-        layout.addSpacing(20)
-        layout.addWidget(btn_select_video)
-        layout.addWidget(self.lbl_video)
-        
-        layout.addSpacing(20)
-        layout.addWidget(btn_select_output)
-        layout.addWidget(self.lbl_output)
-        
-        layout.addStretch()
-        layout.addWidget(btn_generate)
-        
-    def _select_video(self):
-        files, _ = QFileDialog.getOpenFileNames(self, "Select Videos", "", "Video Files (*.mp4 *.mkv *.mov)")
-        if files:
-            self.video_paths = [Path(p) for p in files]
-            self.lbl_video.setText(f"{len(files)} video(s) selected")
-            
-    def _select_output(self):
-        dir = QFileDialog.getExistingDirectory(self, "Select Output Folder", self.output_dir)
-        if dir:
-            self.output_dir = dir
-            self.lbl_output.setText(f"Output: {self.output_dir}")
-            
-    def _on_generate(self):
-        if self.video_paths:
-            self.generate_requested.emit(self.video_paths, self.output_dir)
+        self.content_layout.addWidget(card)

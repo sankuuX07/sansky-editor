@@ -1,0 +1,185 @@
+/* Global Styles */
+* {
+    font-family: "Segoe UI", "Inter", sans-serif;
+    color: #E0E0E0;
+    font-size: 14px;
+}
+
+QMainWindow, QWidget#MainWidget, QStackedWidget {
+    background-color: #0E0E0E;
+}
+
+/* Scrollbars */
+QScrollBar:vertical {
+    border: none;
+    background: #121212;
+    width: 10px;
+    margin: 0px 0px 0px 0px;
+}
+QScrollBar::handle:vertical {
+    background: #333333;
+    min-height: 30px;
+    border-radius: 5px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #555555;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    border: none;
+    background: #121212;
+    height: 10px;
+    margin: 0px 0px 0px 0px;
+}
+QScrollBar::handle:horizontal {
+    background: #333333;
+    min-width: 30px;
+    border-radius: 5px;
+}
+QScrollBar::handle:horizontal:hover {
+    background: #555555;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+/* Frameless Title Bar */
+QWidget#TitleBar {
+    background-color: #151515;
+    border-bottom: 1px solid #222222;
+}
+QWidget#TitleBar QLabel {
+    color: #B0B0B0;
+    font-size: 13px;
+    font-weight: 500;
+}
+QPushButton#CloseBtn, QPushButton#MaxBtn, QPushButton#MinBtn {
+    background: transparent;
+    border: none;
+    padding: 8px;
+    border-radius: 4px;
+}
+QPushButton#CloseBtn:hover {
+    background-color: #E81123;
+    color: white;
+}
+QPushButton#MaxBtn:hover, QPushButton#MinBtn:hover {
+    background-color: #333333;
+}
+
+/* Left Navigation Rail */
+QWidget#NavRail {
+    background-color: #151515;
+    border-right: 1px solid #222222;
+}
+
+QPushButton.NavButton {
+    background-color: transparent;
+    color: #8A8A8A;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    margin: 4px 12px;
+}
+QPushButton.NavButton:hover {
+    background-color: #222222;
+    color: #E0E0E0;
+}
+QPushButton.NavButton:checked {
+    background-color: #2A2A2A;
+    color: #FFFFFF;
+}
+
+/* Cards */
+QWidget.Card {
+    background-color: #1A1A1A;
+    border-radius: 12px;
+    border: 1px solid #282828;
+}
+
+/* Buttons */
+QPushButton.PrimaryButton {
+    background-color: #0078D4;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 24px;
+    font-weight: bold;
+}
+QPushButton.PrimaryButton:hover {
+    background-color: #1084D9;
+}
+QPushButton.PrimaryButton:pressed {
+    background-color: #005A9E;
+}
+
+QPushButton.SecondaryButton {
+    background-color: #2D2D2D;
+    color: #E0E0E0;
+    border: 1px solid #3D3D3D;
+    border-radius: 6px;
+    padding: 10px 24px;
+    font-weight: 600;
+}
+QPushButton.SecondaryButton:hover {
+    background-color: #383838;
+}
+QPushButton.SecondaryButton:pressed {
+    background-color: #1A1A1A;
+}
+
+/* Inputs */
+QLineEdit, QTextEdit, QPlainTextEdit {
+    background-color: #121212;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: #E0E0E0;
+}
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
+    border: 1px solid #0078D4;
+}
+
+/* Progress Bar */
+QProgressBar {
+    background-color: #1A1A1A;
+    border: 1px solid #2A2A2A;
+    border-radius: 4px;
+    text-align: center;
+    color: transparent; /* Hide text */
+}
+QProgressBar::chunk {
+    background-color: #0078D4;
+    border-radius: 3px;
+}
+
+/* Labels */
+QLabel.Header1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+QLabel.Header2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+QLabel.Subtitle {
+    font-size: 14px;
+    color: #8A8A8A;
+}
+
+/* Status Bar */
+QWidget#StatusBar {
+    background-color: #121212;
+    border-top: 1px solid #222222;
+}
+QWidget#StatusBar QLabel {
+    color: #8A8A8A;
+    font-size: 12px;
+}
