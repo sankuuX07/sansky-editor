@@ -7,9 +7,15 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 from ui.main_window.main_window import MainWindow
+from ui.controllers.log_handler import QtLogHandler
 from app.services.backend_service import BackendService
 
 def main():
+    # Setup custom log handler for GUI
+    gui_log_handler = QtLogHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    gui_log_handler.setFormatter(formatter)
+    logging.getLogger().addHandler(gui_log_handler)
     # 1. Start the Backend Service thread
     backend = BackendService()
     backend.start()
@@ -28,7 +34,7 @@ def main():
             app.setStyleSheet(f.read())
             
     # Provide the initialized shorts_generator and the background loop to the GUI
-    window = MainWindow(backend.shorts_generator, backend.loop)
+    window = MainWindow(backend.shorts_generator, backend.loop, backend.engine_manager, gui_log_handler)
     window.show()
     
     exit_code = app.exec()

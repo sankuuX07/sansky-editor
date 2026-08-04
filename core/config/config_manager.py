@@ -16,6 +16,13 @@ class AppConfig(BaseModel):
     output_dir: str = "data/output"
     whisper_model_size: str = "base"
     ffmpeg_path: Optional[str] = None
+    premiere_path: Optional[str] = None
+    cache_dir: str = "data/cache"
+    theme: str = "Dark"
+    performance_preset: str = "Balanced"
+    use_gpu: bool = True
+    threads: int = 4
+    autosave: bool = True
 
 class ConfigManager:
     """Manages loading, validating, and saving configuration with env overrides."""

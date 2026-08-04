@@ -15,12 +15,17 @@ from ui.pages.about_page import AboutPage
 
 from ui.controllers.backend_worker import ShortsGenerationWorker
 from ui.animations.fade_stacked_widget import FadeStackedWidget
+from ui.controllers.log_handler import QtLogHandler
 
 class MainWindow(QMainWindow):
-    def __init__(self, shorts_engine, backend_loop):
+    def __init__(self, shorts_engine, backend_loop, engine_manager=None, log_handler=None):
         super().__init__()
         self.shorts_engine = shorts_engine
         self.backend_loop = backend_loop
+        self.engine_manager = engine_manager
+        
+        if log_handler:
+            log_handler.signals.log_emitted.connect(self._on_log_emitted)
         
         self.setWindowTitle("Sansky AI Editor - Pro")
         self.resize(1280, 800)
@@ -59,7 +64,7 @@ class MainWindow(QMainWindow):
         self.stacked_widget = FadeStackedWidget()
         
         self.pages = {
-            "dashboard": DashboardPage(),
+            "dashboard": DashboardPage(self.engine_manager),
             "media": MediaPage(),
             "processing": ProcessingPage(),
             "results": ResultsPage(),
@@ -69,7 +74,8 @@ class MainWindow(QMainWindow):
         }
         
         self.pages["media"].generate_requested.connect(self.start_generation)
-        self.pages["dashboard"].start_btn.clicked.connect(lambda: self.navigate_to("media"))
+        self.pages["dashboard"].files_dropped.connect(self._on_dashboard_files_dropped)
+        self.pages["processing"].cancel_requested.connect(self.cancel_generation)
         
         for page in self.pages.values():
             self.stacked_widget.addWidget(page)
@@ -103,12 +109,24 @@ class MainWindow(QMainWindow):
             self.stacked_widget.setCurrentWidget(self.pages[page_id])
             self.nav_rail.set_active(page_id)
 
+    def _on_dashboard_files_dropped(self, paths):
+        # When files are dropped on the dashboard, navigate to media page and load them
+        self.navigate_to("media")
+        
+        # We need to manually add them to the media page's processing queue
+        for path in paths:
+            if path not in self.pages["media"].video_paths:
+                self.pages["media"].video_paths.append(path)
+                
+        self.pages["media"].process_new_files(paths)
+
     def start_generation(self, video_paths, output_dir):
         settings = self.pages["settings"].get_settings()
         settings.output_directory = output_dir
         
         self.navigate_to("processing")
         self.pages["processing"].status_lbl.setText("Initializing worker...")
+        self.pages["processing"].start_timer()
         
         self.worker = ShortsGenerationWorker(self.shorts_engine, video_paths, settings, self.backend_loop)
         self.worker.progress_updated.connect(self.pages["processing"].update_progress)
@@ -116,9 +134,18 @@ class MainWindow(QMainWindow):
         self.worker.generation_failed.connect(self._on_generation_failed)
         self.worker.start()
         
+    def cancel_generation(self):
+        if self.worker:
+            self.worker.cancel()
+        
     def _on_generation_completed(self, result):
+        self.pages["processing"].stop_timer()
         self.pages["results"].display_result(result)
         self.navigate_to("results")
         
     def _on_generation_failed(self, error_msg):
+        self.pages["processing"].stop_timer()
         self.pages["processing"].update_progress(f"FAILED: {error_msg}", 100)
+        
+    def _on_log_emitted(self, level, msg):
+        self.pages["logs"].append_log(level, msg)

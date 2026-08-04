@@ -15,23 +15,34 @@ class ShortsGenerationWorker(QThread):
         self.video_paths = video_paths
         self.settings = settings
         self.backend_loop = backend_loop
+        self._future = None
+        self._is_cancelled = False
         
+    def cancel(self):
+        self._is_cancelled = True
+        if self._future:
+            # Thread-safe cancellation of asyncio task
+            self.backend_loop.call_soon_threadsafe(self._future.cancel)
+            
     def run(self):
         try:
             self.progress_updated.emit("Submitting workflow to background thread...", 5)
             
-            # Submit the coroutine to the background event loop in a thread-safe manner
-            future = asyncio.run_coroutine_threadsafe(
+            self._future = asyncio.run_coroutine_threadsafe(
                 self.shorts_engine.generate_shorts(self.video_paths, self.settings),
                 self.backend_loop
             )
             
-            # Block the QThread (not the GUI thread!) until the future completes
-            result = future.result()
+            result = self._future.result()
             
-            self.progress_updated.emit("Workflow Completed", 100)
-            self.generation_completed.emit(result)
-            
+            if not self._is_cancelled:
+                self.progress_updated.emit("Workflow Completed", 100)
+                self.generation_completed.emit(result)
+            else:
+                self.generation_failed.emit("Workflow Cancelled by User")
+                
+        except asyncio.CancelledError:
+            self.generation_failed.emit("Workflow Cancelled by User")
         except Exception as e:
             logger.error(f"Generation failed: {e}", exc_info=True)
             self.generation_failed.emit(str(e))
