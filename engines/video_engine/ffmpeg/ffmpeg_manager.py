@@ -28,23 +28,44 @@ class FFmpegManager:
         except KeyError:
             custom_path = None
 
-        if custom_path and Path(custom_path).exists():
-            ffmpeg = Path(custom_path) / "ffmpeg"
-            ffprobe = Path(custom_path) / "ffprobe"
-            if not ffmpeg.exists(): ffmpeg = Path(custom_path) / "ffmpeg.exe"
-            if not ffprobe.exists(): ffprobe = Path(custom_path) / "ffprobe.exe"
-            self.ffmpeg_path = str(ffmpeg)
-            self.ffprobe_path = str(ffprobe)
-        else:
-            self.ffmpeg_path = shutil.which("ffmpeg") or ""
-            self.ffprobe_path = shutil.which("ffprobe") or ""
+        search_paths = []
+        if custom_path:
+            search_paths.append(Path(custom_path))
+            
+        # Common and portable paths
+        base_dir = Path(__file__).resolve().parent.parent.parent.parent # antigravity-editor
+        search_paths.extend([
+            base_dir / "tools" / "ffmpeg" / "bin",
+            Path("C:/ffmpeg/bin"),
+            Path("C:/Program Files/ffmpeg/bin")
+        ])
 
-        if not self.ffmpeg_path or not Path(self.ffmpeg_path).exists():
-            raise FFmpegNotFoundError("Could not locate FFmpeg binary. Please install it or set 'ffmpeg_path' in config.")
-        if not self.ffprobe_path or not Path(self.ffprobe_path).exists():
-            raise FFmpegNotFoundError("Could not locate FFprobe binary. Please install it or set 'ffmpeg_path' in config.")
-        
-        self.is_ready = True
+        for path in search_paths:
+            if path.exists():
+                ffmpeg = path / "ffmpeg"
+                ffprobe = path / "ffprobe"
+                if not ffmpeg.exists(): ffmpeg = path / "ffmpeg.exe"
+                if not ffprobe.exists(): ffprobe = path / "ffprobe.exe"
+                
+                if ffmpeg.exists() and ffprobe.exists():
+                    self.ffmpeg_path = str(ffmpeg)
+                    self.ffprobe_path = str(ffprobe)
+                    self.is_ready = True
+                    logger.info(f"FFmpeg Manager initialized. Path: {self.ffmpeg_path}")
+                    return
+
+        # Fallback to system PATH
+        ffmpeg_sys = shutil.which("ffmpeg")
+        ffprobe_sys = shutil.which("ffprobe")
+        if ffmpeg_sys and ffprobe_sys:
+            self.ffmpeg_path = ffmpeg_sys
+            self.ffprobe_path = ffprobe_sys
+            self.is_ready = True
+            logger.info(f"FFmpeg Manager initialized from system PATH. Path: {self.ffmpeg_path}")
+            return
+            
+        self.is_ready = False
+        logger.error("Could not locate FFmpeg binary. Please install it or set 'ffmpeg_path' in config.")
         logger.info(f"FFmpeg Manager initialized. Path: {self.ffmpeg_path}")
 
     def run_ffprobe(self, file_path: Path) -> Dict[str, Any]:

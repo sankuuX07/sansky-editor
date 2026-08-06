@@ -23,9 +23,38 @@ class BackendService(threading.Thread):
 
     async def _main_task(self):
         try:
+            import os
+            from pathlib import Path
+            ffmpeg_dir = Path("tools/ffmpeg/bin").absolute()
+            if ffmpeg_dir.exists():
+                os.environ["PATH"] += os.pathsep + str(ffmpeg_dir)
+                logger.info(f"Added {ffmpeg_dir} to system PATH")
+
             # Initialize core components INSIDE the running event loop
             self.engine_manager = EngineManager()
+            
+            from core.dependency_injection.container import container
+            container.register_instance(EngineManager, self.engine_manager)
+            
             self.task_manager = TaskManager(max_workers=4)
+            
+            from engines.video_engine.video_engine import VideoEngine
+            from engines.ai_engine.ai_engine import AIEngine
+            from engines.caption_engine.caption_engine import CaptionEngine
+            from engines.highlight_engine.highlight_engine import HighlightEngine
+            from engines.premiere_engine.premiere_engine import PremiereEngine
+            
+            video_engine = VideoEngine()
+            ai_engine = AIEngine()
+            caption_engine = CaptionEngine()
+            highlight_engine = HighlightEngine()
+            premiere_engine = PremiereEngine()
+            
+            self.engine_manager.register(video_engine)
+            self.engine_manager.register(ai_engine)
+            self.engine_manager.register(caption_engine)
+            self.engine_manager.register(highlight_engine)
+            self.engine_manager.register(premiere_engine)
             
             automation = AutomationEngine(self.engine_manager, self.task_manager)
             self.engine_manager.register(automation)

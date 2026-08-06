@@ -39,29 +39,40 @@ class WorkflowExecutor:
                 if all(dep in completed_step_ids for dep in step.depends_on):
                     pending_steps.remove(step)
                     step.status = WorkflowStatus.RUNNING
+                    import time
+                    step._start_time = time.time()
+                    logger.info(f"[START] {step.action.replace('_', ' ').title()}")
                     in_progress[step.step_id] = asyncio.create_task(self._run_step(step))
             
             if not in_progress and pending_steps:
-                raise WorkflowExecutionError("Deadlock: Cannot resolve remaining dependencies.")
+                raise WorkflowExecutionError("Deadlock detected. Dependencies cannot be resolved.")
                 
-            done, _ = await asyncio.wait(in_progress.values(), return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(
+                in_progress.values(),
+                return_when=asyncio.FIRST_COMPLETED
+            )
             
             for task in done:
-                step_id = next(s_id for s_id, t in in_progress.items() if t == task)
+                step_id = next(k for k, v in in_progress.items() if v == task)
                 del in_progress[step_id]
                 step = next(s for s in workflow.steps if s.step_id == step_id)
                 
                 try:
+                    import time
+                    start_time = getattr(step, '_start_time', time.time())
                     result = task.result()
+                    exec_time = time.time() - start_time
                     step.status = WorkflowStatus.COMPLETED
                     step.result = result
                     self._context[step_id] = result
                     completed_step_ids.add(step_id)
                     self.progress.mark_step_completed(workflow.workflow_id, step_id)
+                    logger.info(f"[SUCCESS] {step.action.replace('_', ' ').title()} in {exec_time:.2f}s")
                 except Exception as e:
                     step.status = WorkflowStatus.FAILED
                     step.error = str(e)
                     action = self.recovery.determine_action(step)
+                    logger.error(f"[FAILED] {step.action.replace('_', ' ').title()} - {e} (File: {__file__}, Line: 63)")
                     if action.action_type == RecoveryActionType.RETRY:
                         logger.warning(f"Retrying step '{step_id}'")
                         step.retry_count += 1

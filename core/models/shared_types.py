@@ -9,6 +9,7 @@ from pathlib import Path
 class EngineStatus(Enum):
     UNINITIALIZED = "UNINITIALIZED"
     INITIALIZING = "INITIALIZING"
+    INITIALIZED = "INITIALIZED"
     RUNNING = "RUNNING"
     STOPPED = "STOPPED"
     ERROR = "ERROR"

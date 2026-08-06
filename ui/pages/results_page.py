@@ -20,7 +20,13 @@ class ClipCard(QFrame):
         self.thumbnail_lbl.setFixedSize(240, 135)
         self.thumbnail_lbl.setStyleSheet("background-color: #171A22; border-radius: 8px;")
         self.thumbnail_lbl.setAlignment(Qt.AlignCenter)
-        self.thumbnail_lbl.setText("Generating Thumbnail...")
+        
+        if getattr(clip, 'thumbnail_path', None) and os.path.exists(clip.thumbnail_path):
+            from PySide6.QtGui import QPixmap
+            pixmap = QPixmap(str(clip.thumbnail_path))
+            self.thumbnail_lbl.setPixmap(pixmap.scaled(self.thumbnail_lbl.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        else:
+            self.thumbnail_lbl.setText("Thumbnail Unavailable")
         
         info_layout = QVBoxLayout()
         info_layout.setSpacing(8)
@@ -44,15 +50,15 @@ class ClipCard(QFrame):
         action_layout = QVBoxLayout()
         action_layout.setSpacing(12)
         
-        open_prem_btn = QPushButton("Open in Premiere")
-        open_prem_btn.setProperty("class", "PrimaryButton")
-        open_prem_btn.clicked.connect(self._open_premiere)
+        open_video_btn = QPushButton("Play Video")
+        open_video_btn.setProperty("class", "PrimaryButton")
+        open_video_btn.clicked.connect(self._open_video)
         
         open_folder_btn = QPushButton("Open Folder")
         open_folder_btn.setProperty("class", "SecondaryButton")
         open_folder_btn.clicked.connect(self._open_folder)
         
-        action_layout.addWidget(open_prem_btn)
+        action_layout.addWidget(open_video_btn)
         action_layout.addWidget(open_folder_btn)
         action_layout.addStretch()
         
@@ -74,13 +80,24 @@ class ClipCard(QFrame):
         return w
 
     def _open_folder(self):
+        if not os.path.exists(self.output_dir):
+            try:
+                os.makedirs(self.output_dir, exist_ok=True)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to create output directory:\n{e}")
+                return
+                
+        if not os.listdir(self.output_dir):
+            QMessageBox.information(self, "Directory Empty", "The output folder was created, but no files have been generated yet.")
+            
         QDesktopServices.openUrl(QUrl.fromLocalFile(self.output_dir))
             
-    def _open_premiere(self):
-        if self.premiere_path and os.path.exists(self.premiere_path):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.premiere_path)))
+    def _open_video(self):
+        video_path = os.path.join(self.output_dir, "output.mp4")
+        if os.path.exists(video_path):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(video_path))
         else:
-            QMessageBox.warning(self, "Premiere Project Not Found", "No valid Premiere project file was generated.")
+            QMessageBox.warning(self, "Video Not Found", "No valid MP4 video file was generated. The Video Engine may have failed during rendering.")
 
 class ResultsPage(BasePage):
     def __init__(self, parent=None):
@@ -129,14 +146,17 @@ class ResultsPage(BasePage):
         self.result = result
         
         # Clear existing cards
-        while self.scroll_layout.count() > 1:
-            item = self.scroll_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        for i in reversed(range(self.scroll_layout.count())):
+            item = self.scroll_layout.itemAt(i)
+            widget = item.widget()
+            if widget and widget is not self.empty_widget:
+                self.scroll_layout.takeAt(i)
+                widget.deleteLater()
                 
         if not result or not result.projects:
             self.empty_widget.show()
-            self.scroll_layout.insertWidget(0, self.empty_widget)
+            if self.scroll_layout.indexOf(self.empty_widget) == -1:
+                self.scroll_layout.insertWidget(0, self.empty_widget)
             return
             
         self.empty_widget.hide()

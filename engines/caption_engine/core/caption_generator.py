@@ -28,15 +28,19 @@ class CaptionGenerator:
                 
                 # If no word-level timestamps are provided, create a single-word segment block
                 if not words_data:
-                    timeline.segments.append(
-                        CaptionSegment(
-                            index=segment_idx,
-                            text=seg.get("text", "").strip(),
-                            start_time=seg.get("start", 0.0),
-                            end_time=seg.get("end", 0.0)
+                    text_str = seg.get("text", "").strip()
+                    s_time = seg.get("start", 0.0)
+                    e_time = max(seg.get("end", 0.0), s_time + 0.1)
+                    if text_str:
+                        timeline.segments.append(
+                            CaptionSegment(
+                                index=segment_idx,
+                                text=text_str,
+                                start_time=s_time,
+                                end_time=e_time
+                            )
                         )
-                    )
-                    segment_idx += 1
+                        segment_idx += 1
                     continue
                 
                 # Process word-level data
@@ -52,16 +56,20 @@ class CaptionGenerator:
                     )
                 
                 if caption_words:
-                    timeline.segments.append(
-                        CaptionSegment(
-                            index=segment_idx,
-                            text=" ".join(w.text for w in caption_words),
-                            start_time=caption_words[0].start_time,
-                            end_time=caption_words[-1].end_time,
-                            words=caption_words
+                    text_str = " ".join(w.text for w in caption_words).strip()
+                    s_time = caption_words[0].start_time
+                    e_time = max(caption_words[-1].end_time, s_time + 0.1) # ensure valid duration
+                    if text_str:
+                        timeline.segments.append(
+                            CaptionSegment(
+                                index=segment_idx,
+                                text=text_str,
+                                start_time=s_time,
+                                end_time=e_time,
+                                words=caption_words
+                            )
                         )
-                    )
-                    segment_idx += 1
+                        segment_idx += 1
 
             return timeline
         except Exception as e:

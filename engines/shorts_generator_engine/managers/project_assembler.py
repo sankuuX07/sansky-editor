@@ -16,7 +16,7 @@ class ProjectAssembler:
         out_dir.mkdir(parents=True, exist_ok=True)
         
         project_id = str(uuid.uuid4())
-        project_path = out_dir / f"project_{project_id}.prproj"
+        project_path = out_dir / f"project_{project_id}.xml"
         
         return ShortsProject(
             project_id=project_id,

@@ -2,9 +2,18 @@
 Memory Manager for monitoring RAM/VRAM and caching loaded models safely.
 """
 import logging
-import psutil
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
 from typing import Dict, Any, List
-import torch
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
 from core.models.ai_models import MemorySnapshot
 from core.exceptions.ai_exceptions import OutOfMemoryError
 from engines.ai_engine.hardware.gpu_manager import GPUManager
@@ -20,21 +29,27 @@ class MemoryManager:
 
     def get_memory_snapshot(self) -> MemorySnapshot:
         """Get current RAM and VRAM usage."""
-        ram = psutil.virtual_memory()
+        ram_used = 0.0
+        ram_total = 0.0
+        if PSUTIL_AVAILABLE:
+            ram = psutil.virtual_memory()
+            ram_used = ram.used
+            ram_total = ram.total
+            
         vram_used = 0.0
         vram_total = 0.0
 
         if self.gpu_manager.active_backend == self.gpu_manager.active_backend.CUDA:
             try:
-                free, total = torch.cuda.mem_get_info(0)
-                vram_used = (total - free) / (1024 * 1024)
-                vram_total = total / (1024 * 1024)
+                if TORCH_AVAILABLE:
+                    free, total = torch.cuda.mem_get_info(0)
+                    vram_used = (total - free)
+                    vram_total = total
             except Exception:
                 pass
 
         return MemorySnapshot(
-            ram_used_mb=ram.used / (1024 * 1024),
-            ram_total_mb=ram.total / (1024 * 1024),
+            ram_total_mb=ram_total / (1024 * 1024) if ram_total > 0 else 0,
             vram_used_mb=vram_used,
             vram_total_mb=vram_total
         )
@@ -70,7 +85,7 @@ class MemoryManager:
             self._model_usage_order.remove(model_id)
             import gc
             gc.collect()
-            if torch.cuda.is_available():
+            if TORCH_AVAILABLE and torch.cuda.is_available():
                 torch.cuda.empty_cache()
             logger.info(f"Unloaded model {model_id} manually.")
 
@@ -81,7 +96,7 @@ class MemoryManager:
             del self.loaded_models[oldest]
             import gc
             gc.collect()
-            if torch.cuda.is_available():
+            if TORCH_AVAILABLE and torch.cuda.is_available():
                 torch.cuda.empty_cache()
             logger.info(f"Evicted model {oldest} to free memory.")
             break

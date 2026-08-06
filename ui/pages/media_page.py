@@ -233,5 +233,5 @@ class MediaPage(BasePage):
     def _on_start_clicked(self):
         output_dir = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if output_dir and self.video_paths:
-            self.generate_requested.emit(self.video_paths, output_dir)
+            self.generate_requested.emit(list(self.video_paths), output_dir)
             self._clear_all()

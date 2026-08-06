@@ -3,7 +3,12 @@ GPU Manager for detecting and allocating hardware resources.
 """
 import logging
 from typing import List, Optional
-import torch
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
 from core.models.ai_models import HardwareBackend, GPUInfo, CPUInfo
 from core.exceptions.ai_exceptions import GPUInitializationError
 
@@ -34,18 +39,31 @@ class GPUManager:
 
     def _detect_cpu(self) -> None:
         """Fallback CPU detection."""
-        import psutil
-        mem = psutil.virtual_memory()
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            total_mem = int(mem.total / (1024 * 1024))
+            free_mem = int(mem.available / (1024 * 1024))
+            cores = psutil.cpu_count(logical=False) or 1
+        except ImportError:
+            logger.warning("psutil is not installed; using placeholder CPU detection.")
+            total_mem = 8192
+            free_mem = 4096
+            cores = 4
+
         self.cpu_info = CPUInfo(
             backend=HardwareBackend.CPU,
             device_name="System CPU",
-            total_memory_mb=int(mem.total / (1024 * 1024)),
-            free_memory_mb=int(mem.available / (1024 * 1024)),
-            core_count=psutil.cpu_count(logical=False) or 1
+            total_memory_mb=total_mem,
+            free_memory_mb=free_mem,
+            core_count=cores
         )
 
     def _detect_cuda(self) -> None:
         """Detect NVIDIA CUDA GPUs."""
+        if not TORCH_AVAILABLE:
+            logger.warning("Torch is not installed; skipping CUDA detection.")
+            return
         try:
             if torch.cuda.is_available():
                 for i in range(torch.cuda.device_count()):
@@ -63,6 +81,9 @@ class GPUManager:
 
     def _detect_mps(self) -> None:
         """Detect Apple Silicon MPS."""
+        if not TORCH_AVAILABLE:
+            logger.warning("Torch is not installed; skipping MPS detection.")
+            return
         try:
             if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
                 self.gpus.append(GPUInfo(

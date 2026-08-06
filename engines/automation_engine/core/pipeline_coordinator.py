@@ -20,16 +20,56 @@ class PipelineCoordinator:
         
         # Here we map step.action to actual engine method calls.
         if step.engine_name == "video_engine" and step.action == "extract_audio":
-            return {"audio_path": "simulated_audio.wav"}
+            video_path = step.inputs.get("video_path")
+            from pathlib import Path
+            result = engine.pipeline.run_standard_ingestion(Path(video_path), extract_audio=True)
+            return {"audio_path": str(result.extracted_audio_path)}
                 
-        elif step.engine_name == "whisper_engine" and step.action == "transcribe":
-            return {"transcription": "simulated text"}
+        elif step.engine_name == "ai_engine" and step.action == "transcribe":
+            audio_path = context.get("extract_audio", {}).get("audio_path")
+            if not hasattr(engine, "transcribe"):
+                raise NotImplementedError("AIEngine lacks a transcribe method.")
+            transcript = engine.transcribe(audio_path)
+            return {"transcript_data": transcript}
                 
         elif step.engine_name == "caption_engine" and step.action == "generate_captions":
-            return {"caption_file": "simulated_captions.srt"}
+            video_path = step.inputs.get("video_path")
+            transcript_data = context.get("transcribe", {}).get("transcript_data")
+            from pathlib import Path
+            timeline = engine.process_transcript(Path(video_path).stem, transcript_data)
+            return {"caption_timeline": timeline}
+            
+        elif step.engine_name == "highlight_engine" and step.action == "extract_highlights":
+            video_path = step.inputs.get("video_path")
+            audio_path = context.get("extract_audio", {}).get("audio_path")
+            from pathlib import Path
+            timeline = engine.process_video(Path(video_path).stem, Path(video_path), Path(audio_path))
+            return {"highlight_timeline": timeline}
                 
         elif step.engine_name == "premiere_engine" and step.action == "build_timeline":
-            return {"timeline_status": "built"}
+            from core.models.premiere_models import SequenceInfo, TimelineClip
+            from pathlib import Path
+            
+            video_path = step.inputs.get("video_path")
+            highlight_timeline = context.get("extract_highlights", {}).get("highlight_timeline")
+            
+            sequence = SequenceInfo(name="Generated Shorts", width=1080, height=1920, framerate=30.0)
+            
+            clips = []
+            if highlight_timeline:
+                for c in highlight_timeline.highlights:
+                    clips.append(TimelineClip(
+                        asset_path=Path(video_path),
+                        start_time=c.start_time,
+                        end_time=c.end_time
+                    ))
+            
+            # The engine has a timeline_builder
+            engine.timeline_builder.build_timeline(sequence, clips)
+            
+            xml_data = engine.timeline_builder.get_last_xml()
+            
+            return {"timeline_status": "built", "xml_data": xml_data}
                 
         # Generic fallback for direct method execution
         method = getattr(engine, step.action, None)

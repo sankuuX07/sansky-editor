@@ -58,3 +58,42 @@ class AIEngine(BaseEngine):
 
     def health_check(self) -> bool:
         return self._status == EngineStatus.RUNNING and self.gpu_manager.active_backend is not None
+
+    def transcribe(self, audio_path: str) -> dict:
+        """
+        Transcribes audio using a Whisper model.
+        Falls back to a mocked dictionary if no real inference is available.
+        """
+        self.logger.info(f"Transcribing audio: {audio_path}")
+        
+        try:
+            import whisper
+        except ImportError:
+            self.logger.error("Whisper is not installed. Returning fallback.")
+            return {
+                "text": "Fallback generated transcript because whisper is not installed.",
+                "segments": [
+                    {
+                        "start": 0.0,
+                        "end": 2.0,
+                        "text": "Fallback generated transcript",
+                        "words": [
+                            {"word": "Fallback", "start": 0.0, "end": 0.5, "probability": 0.9},
+                            {"word": "generated", "start": 0.5, "end": 1.0, "probability": 0.9},
+                            {"word": "transcript", "start": 1.0, "end": 2.0, "probability": 0.9}
+                        ]
+                    }
+                ]
+            }
+
+        try:
+            # We use 'tiny' model for speed in execution
+            model = whisper.load_model("tiny", device="cpu")
+            self.logger.info("Whisper model loaded successfully.")
+            
+            result = model.transcribe(audio_path, word_timestamps=True)
+            self.logger.info("Audio transcribed successfully.")
+            return result
+        except Exception as e:
+            self.logger.error(f"Failed to transcribe audio: {e}")
+            raise

@@ -43,6 +43,7 @@ class GeneratedClip:
     end_time: float
     score: float
     captions: List[Any] = field(default_factory=list)
+    thumbnail_path: Optional[Path] = None
 
 @dataclass
 class ClipStatistics:
