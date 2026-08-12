@@ -53,6 +53,13 @@ class SpeechEvent(HighlightEvent):
         self.text = text
 
 @dataclass
+class GameplayVisualEvent(HighlightEvent):
+    evidence_type: str
+    def __init__(self, start_time: float, end_time: float, intensity: float, evidence_type: str) -> None:
+        super().__init__(event_type="gameplay_visual_evidence", start_time=start_time, end_time=end_time, intensity=intensity)
+        self.evidence_type = evidence_type
+
+@dataclass
 class HighlightScore:
     total_score: float
     components: Dict[str, float] = field(default_factory=dict)
@@ -65,7 +72,9 @@ class HighlightCandidate:
     events_contained: List[HighlightEvent] = field(default_factory=list)
     semantic_type: Optional[str] = None
     confidence: float = 0.0
+    engagement_score: float = 0.0
     reason: str = ""
+    evidence: List[str] = field(default_factory=list)
 
 @dataclass
 class HighlightTimeline:
@@ -85,6 +94,7 @@ class HighlightConfig:
         "high_motion": 1.5,
         "high_audio_intensity": 2.0,
         "speech_keyword": 3.0,
+        "gameplay_visual_evidence": 5.0,
         EventType.CLUTCH.value: 10.0,
         EventType.MULTI_KILL.value: 8.0,
         EventType.ELIMINATION.value: 6.0,
