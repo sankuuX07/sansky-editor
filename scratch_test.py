@@ -1,87 +1,47 @@
-import sys
-import os
-from pathlib import Path
-from unittest.mock import patch
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTimer, QCoreApplication
 import logging
+from pathlib import Path
+from core.models.highlight_models import HighlightCandidate, HighlightConfig, MotionEvent, AudioEvent, SpeechEvent, SceneEvent
+from engines.highlight_engine.core.semantic_classifier import SemanticClassifier
+from engines.highlight_engine.core.highlight_scoring_engine import HighlightScoringEngine
 
 logging.basicConfig(level=logging.DEBUG)
 
-# Add project root to path
-sys.path.insert(0, os.path.abspath('.'))
-
-from app.services.backend_service import BackendService
-from ui.main_window.main_window import MainWindow
-
-def main():
-    app = QApplication(sys.argv)
+def test_synthetic_highlights():
+    print("Running Synthetic Highlight Tests...")
+    classifier = SemanticClassifier()
+    scorer = HighlightScoringEngine()
+    config = HighlightConfig()
     
-    # Initialize backend
-    backend = BackendService()
-    backend.start()
+    # 1. Short gameplay with one fight
+    fight_candidate = HighlightCandidate(start_time=10.0, end_time=15.0, score=None, events_contained=[
+        MotionEvent(10.0, 10.5, 0.8),
+        AudioEvent(10.2, 10.7, 0.9),
+        MotionEvent(12.0, 12.5, 0.7),
+        AudioEvent(12.1, 12.6, 0.8)
+    ])
     
-    print("Waiting for backend to be ready...")
-    if not backend.wait_until_ready(timeout=20.0):
-        print("Backend failed to start")
-        sys.exit(1)
+    # 2. Gameplay containing a clutch
+    clutch_candidate = HighlightCandidate(start_time=30.0, end_time=40.0, score=None, events_contained=[
+        MotionEvent(30.0, 30.5, 0.9),
+        AudioEvent(30.2, 30.7, 0.9),
+        SpeechEvent(31.0, 32.0, 1.0, "last guy is low"),
+        MotionEvent(35.0, 35.5, 0.9),
+        AudioEvent(35.2, 35.7, 0.9),
+        SpeechEvent(36.0, 37.0, 1.0, "nice clutch!"),
+    ])
+    
+    # 3. Boring section
+    boring_candidate = HighlightCandidate(start_time=50.0, end_time=80.0, score=None, events_contained=[
+        MotionEvent(50.0, 50.5, 0.4),
+        MotionEvent(65.0, 65.5, 0.3)
+    ])
+    
+    candidates = [fight_candidate, clutch_candidate, boring_candidate]
+    classified = classifier.classify(candidates, config)
+    
+    for c in classified:
+        c.score = scorer.score_candidate(c, config)
+        print(f"Time: {c.start_time}-{c.end_time} | Type: {c.semantic_type} | Conf: {c.confidence} | Score: {c.score.total_score} | Reason: {c.reason}")
         
-    print("Backend ready. Initializing UI...")
-    
-    main_window = MainWindow(backend.shorts_generator, backend.loop, backend.engine_manager)
-    # Don't show to avoid display issues in headless environment, just test logic
-    
-    # Setup test video
-    video_path = Path("test_assets/dummy_gameplay.mp4").absolute()
-    if not video_path.exists():
-        print(f"Error: {video_path} not found")
-        backend.shutdown()
-        sys.exit(1)
-        
-    # Simulate adding file to media page
-    media_page = main_window.pages["media"]
-    media_page.video_paths.append(str(video_path))
-    media_page.process_new_files([str(video_path)])
-    
-    output_dir = str(Path("data/test_output").absolute())
-    
-    # Patch QFileDialog to automatically return our output_dir without blocking
-    with patch("PySide6.QtWidgets.QFileDialog.getExistingDirectory", return_value=output_dir):
-        print("Simulating 'Configure & Generate' click...")
-        # Since start_btn is enabled by process_new_files, we can click it
-        media_page.start_btn.setEnabled(True)
-        media_page.start_btn.click()
-        
-    # Now we need to wait for the worker to finish
-    print("Worker started. Processing events until Results page is active...")
-    
-    def check_status():
-        current_page = main_window.stacked_widget.currentWidget()
-        if current_page == main_window.pages["results"]:
-            print("Successfully reached Results page!")
-            # Verify output files
-            if list(Path(output_dir).glob("*.mp4")) or list(Path(output_dir).glob("*.xml")):
-                print("Real output files verified!")
-            else:
-                print("Error: Reached results but no real output files found.")
-            backend.shutdown()
-            app.quit()
-        elif current_page == main_window.pages["processing"]:
-            progress = main_window.pages["processing"].progress_bar.value()
-            status = main_window.pages["processing"].status_lbl.text()
-            print(f"Processing... {progress}%: {status}")
-            if "FAILED" in status:
-                print(f"Failed! Status: {status}")
-                backend.shutdown()
-                app.quit()
-        else:
-            print(f"Current page: {current_page.__class__.__name__}")
-            
-    timer = QTimer()
-    timer.timeout.connect(check_status)
-    timer.start(2000)
-    
-    app.exec()
-    
 if __name__ == "__main__":
-    main()
+    test_synthetic_highlights()

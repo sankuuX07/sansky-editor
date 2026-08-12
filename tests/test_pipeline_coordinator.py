@@ -5,7 +5,17 @@ from engines.automation_engine.core.pipeline_coordinator import PipelineCoordina
 
 class MockEngineManager:
     def get_engine(self, name):
+        class MockPipeline:
+            def run_standard_ingestion(self, path, extract_audio):
+                class MockResult:
+                    def __init__(self):
+                        self.extracted_audio_path = "simulated_audio.wav"
+                return MockResult()
+                
         class Engine:
+            def __init__(self):
+                self.pipeline = MockPipeline()
+                
             async def custom_action(self):
                 return "custom_result"
         return Engine()
@@ -16,7 +26,7 @@ async def test_pipeline_coordinator():
     coordinator = PipelineCoordinator(manager)
     
     # Test mapped action
-    step1 = WorkflowStep(step_id="1", engine_name="video_engine", action="extract_audio")
+    step1 = WorkflowStep(step_id="1", engine_name="video_engine", action="extract_audio", inputs={"video_path": "dummy.mp4"})
     res1 = await coordinator.execute_step(step1, {})
     assert res1["audio_path"] == "simulated_audio.wav"
     

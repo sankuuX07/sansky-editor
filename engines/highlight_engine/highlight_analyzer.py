@@ -8,7 +8,9 @@ from core.models.highlight_models import HighlightEvent, HighlightCandidate, Hig
 from engines.highlight_engine.analyzers.scene_analyzer import SceneAnalyzer
 from engines.highlight_engine.analyzers.motion_analyzer import MotionAnalyzer
 from engines.highlight_engine.analyzers.audio_analyzer_adapter import AudioAnalyzerAdapter
+from engines.highlight_engine.analyzers.speech_analyzer import SpeechAnalyzer
 from engines.highlight_engine.core.highlight_merger import HighlightMerger
+from engines.highlight_engine.core.semantic_classifier import SemanticClassifier
 from engines.highlight_engine.core.highlight_scoring_engine import HighlightScoringEngine
 from engines.highlight_engine.core.highlight_validator import HighlightValidator
 from engines.highlight_engine.core.highlight_ranker import HighlightRanker
@@ -22,8 +24,10 @@ class HighlightAnalyzer:
         self.scene_analyzer = SceneAnalyzer()
         self.motion_analyzer = MotionAnalyzer()
         self.audio_analyzer = AudioAnalyzerAdapter()
+        self.speech_analyzer = SpeechAnalyzer()
         
         self.merger = HighlightMerger()
+        self.semantic_classifier = SemanticClassifier()
         self.scoring_engine = HighlightScoringEngine()
         self.validator = HighlightValidator()
         self.ranker = HighlightRanker()
@@ -36,14 +40,16 @@ class HighlightAnalyzer:
         all_events.extend(self.scene_analyzer.analyze(video_path))
         all_events.extend(self.motion_analyzer.analyze(video_path))
         all_events.extend(self.audio_analyzer.analyze(audio_path))
+        all_events.extend(self.speech_analyzer.analyze(audio_path))
         
         logger.info(f"Total raw events detected: {len(all_events)}")
         
         candidates = self.merger.merge(all_events, config)
+        candidates = self.semantic_classifier.classify(candidates, config)
         valid_candidates = self.validator.validate(candidates, config)
         
         for candidate in valid_candidates:
-            candidate.score = self.scoring_engine.score_events(candidate.events_contained, config)
+            candidate.score = self.scoring_engine.score_candidate(candidate, config)
             
         ranked = self.ranker.rank(valid_candidates, config)
         

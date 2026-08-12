@@ -32,6 +32,38 @@ class MockEngine(BaseEngine):
     def health_check(self) -> bool:
         return True
 
+    @property
+    def pipeline(self):
+        class MockPipeline:
+            def run_standard_ingestion(self, path, extract_audio=False):
+                class MockResult:
+                    def __init__(self):
+                        self.extracted_audio_path = "simulated_audio.wav"
+                return MockResult()
+        return MockPipeline()
+
+    def transcribe(self, audio_path):
+        return {"segments": []}
+        
+    def process_transcript(self, name, data):
+        class MockTimeline:
+            def __init__(self):
+                self.highlights = []
+        return MockTimeline()
+        
+    def process_video(self, name, video_path, audio_path):
+        from core.models.highlight_models import HighlightTimeline, HighlightCandidate
+        return HighlightTimeline(video_id=name, highlights=[
+            HighlightCandidate(start_time=0, end_time=5, score=None)
+        ])
+        
+    @property
+    def timeline_builder(self):
+        class MockBuilder:
+            def build_timeline(self, seq, clips): pass
+            def get_last_xml(self): return "<xml></xml>"
+        return MockBuilder()
+
 @pytest.mark.asyncio
 async def test_end_to_end_workflow(temp_workspace):
     engine_manager = EngineManager()
@@ -39,8 +71,9 @@ async def test_end_to_end_workflow(temp_workspace):
     task_manager.start_workers()
     
     engine_manager.register(MockEngine("video_engine"))
-    engine_manager.register(MockEngine("whisper_engine"))
+    engine_manager.register(MockEngine("ai_engine"))
     engine_manager.register(MockEngine("caption_engine"))
+    engine_manager.register(MockEngine("highlight_engine"))
     engine_manager.register(MockEngine("premiere_engine"))
     
     automation_engine = AutomationEngine(engine_manager, task_manager)

@@ -33,8 +33,8 @@ class HighlightMerger:
             else:
                 # Close current cluster and start new one
                 candidates.append(HighlightCandidate(
-                    start_time=current_start,
-                    end_time=current_end,
+                    start_time=max(0.0, current_start - config.pre_roll_sec),
+                    end_time=current_end + config.post_roll_sec,
                     score=None, # Will be scored later
                     events_contained=current_cluster
                 ))
@@ -45,8 +45,8 @@ class HighlightMerger:
         # Append the final cluster
         if current_cluster:
             candidates.append(HighlightCandidate(
-                start_time=current_start,
-                end_time=current_end,
+                start_time=max(0.0, current_start - config.pre_roll_sec),
+                end_time=current_end + config.post_roll_sec,
                 score=None,
                 events_contained=current_cluster
             ))

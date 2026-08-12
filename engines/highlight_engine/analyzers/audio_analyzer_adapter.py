@@ -38,9 +38,9 @@ class AudioAnalyzerAdapter:
             
             # If no peaks, add some defaults to prevent empty lists if perfectly quiet
             if not events:
-                logger.debug("No significant audio peaks found.")
+                logger.debug("No significant high audio intensity events found.")
                 
-            logger.debug(f"Detected {len(events)} audio events.")
+            logger.debug(f"Detected {len(events)} high audio intensity events.")
             return events
         except Exception as e:
             raise AudioAnalysisError(f"Failed to analyze audio: {e}") from e

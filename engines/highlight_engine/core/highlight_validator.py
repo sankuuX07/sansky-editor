@@ -31,6 +31,11 @@ class HighlightValidator:
                 logger.warning(f"Rejecting corrupted clip: Invalid timestamps {c.start_time} - {c.end_time}.")
                 continue
                 
+            from core.models.highlight_models import EventType
+            if c.semantic_type == EventType.DEAD_TIME.value:
+                logger.debug(f"Rejecting clip: Tagged as DEAD_TIME.")
+                continue
+                
             valid_candidates.append(c)
             
         return valid_candidates
