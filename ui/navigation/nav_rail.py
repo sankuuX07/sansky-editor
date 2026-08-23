@@ -17,6 +17,7 @@ class NavRail(QWidget):
 
         # Top section
         self.add_nav_item("dashboard", "🏠 Dashboard")
+        self.add_nav_item("library", "📚 Library")
         self.add_nav_item("media", "📁 Media")
         self.add_nav_item("processing", "⚙️ Processing")
         self.add_nav_item("results", "✨ Results")

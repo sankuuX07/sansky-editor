@@ -77,5 +77,38 @@ class BatchProcessingEngine:
         if batch.status != BatchJobStatus.CANCELLED:
             batch.status = BatchJobStatus.COMPLETED
             
+        try:
+            from engines.library_engine.library_engine import LibraryEngine
+            from core.models.library_models import ProjectLibraryEntry, ProjectType
+            
+            lib = LibraryEngine()
+            
+            # Record the batch itself as an entry so the user can find the batch.
+            src_names = [j.video_path.name for j in batch.jobs]
+            summary_name = f"Batch: {', '.join(src_names[:2])}{' and others' if len(src_names) > 2 else ''}"
+            
+            b_entry = ProjectLibraryEntry(
+                project_id=batch.batch_id,
+                project_type=ProjectType.BATCH.value,
+                source_name=summary_name,
+                source_path="Multiple",
+                output_path="Multiple",
+                status=batch.status.value,
+                highlight_count=0
+            )
+            lib.register_project(b_entry)
+            
+            # For each job in the batch, tag them with the batch_id
+            for job in batch.jobs:
+                if job.result and job.result.projects:
+                    for p in job.result.projects:
+                        sub_entry = lib.get_project(p.project_id)
+                        if sub_entry:
+                            sub_entry.batch_id = batch.batch_id
+                            lib.update_project(sub_entry)
+                            
+        except Exception as e:
+            logger.error(f"Failed to register batch in Library: {e}")
+            
         logger.info(f"Completed batch {batch.batch_id}. {batch.completed_jobs} completed, {batch.failed_jobs} failed.")
         return batch

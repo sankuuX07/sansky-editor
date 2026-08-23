@@ -83,4 +83,32 @@ class ShortsGeneratorEngine(BaseEngine):
         self.output_manager.finalize(result)
         self.report_generator.generate(result)
         
+        try:
+            from engines.library_engine.library_engine import LibraryEngine
+            from core.models.library_models import ProjectLibraryEntry, ProjectType
+            import os
+            
+            lib = LibraryEngine()
+            for p in result.projects:
+                src_path = str(p.clips[0].source_video) if p.clips else "unknown"
+                out_path = str(p.premiere_project_path.parent) if p.premiere_project_path else None
+                
+                # Check if it was a re-edit
+                # If we passed a specific re-edit flag, we could use RE_EDIT, but we can default to SINGLE_VIDEO
+                ptype = ProjectType.SINGLE_VIDEO.value
+                
+                entry = ProjectLibraryEntry(
+                    project_id=p.project_id,
+                    project_type=ptype,
+                    source_name=os.path.basename(src_path),
+                    source_path=src_path,
+                    output_path=out_path,
+                    status=result.status.value,
+                    highlight_count=len(p.clips),
+                    creator_report_path=str(p.premiere_project_path.parent / "content_strategy_report.json") if out_path else None
+                )
+                lib.register_project(entry)
+        except Exception as e:
+            self.logger.error(f"Failed to register project in Library: {e}")
+            
         return result

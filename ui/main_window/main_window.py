@@ -6,6 +6,7 @@ from ui.navigation.nav_rail import NavRail
 from ui.navigation.status_bar import StatusBar
 
 from ui.pages.dashboard_page import DashboardPage
+from ui.pages.library_page import LibraryPage
 from ui.pages.media_page import MediaPage
 from ui.pages.processing_page import ProcessingPage
 from ui.pages.results_page import ResultsPage
@@ -65,6 +66,7 @@ class MainWindow(QMainWindow):
         
         self.pages = {
             "dashboard": DashboardPage(self.engine_manager),
+            "library": LibraryPage(),
             "media": MediaPage(),
             "processing": ProcessingPage(),
             "results": ResultsPage(),
@@ -72,6 +74,8 @@ class MainWindow(QMainWindow):
             "logs": LogsPage(),
             "about": AboutPage()
         }
+        
+        self.pages["library"].reedit_requested.connect(self.handle_reedit)
         
         self.pages["media"].generate_requested.connect(self.start_generation)
         self.pages["dashboard"].files_dropped.connect(self._on_dashboard_files_dropped)
@@ -149,3 +153,21 @@ class MainWindow(QMainWindow):
         
     def _on_log_emitted(self, level, msg):
         self.pages["logs"].append_log(level, msg)
+
+    def handle_reedit(self, entry):
+        from pathlib import Path
+        import os
+        src = Path(entry.source_path)
+        if not src.exists():
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Missing Source", "The source video for this project is missing. Cannot re-edit.")
+            return
+            
+        # Add it to the media page queue
+        self.pages["media"].video_paths.clear()
+        self.pages["media"].process_new_files([str(src)])
+        self.navigate_to("media")
+        
+        # In a full implementation, we'd also load the previous settings from the old output folder
+        # (e.g. settings.json), but for now we just seed the media queue with the old file.
+
