@@ -25,6 +25,8 @@ class CaptionExporter:
                 content = self.formatter.format_srt(timeline)
             elif settings.format == ExportFormat.VTT:
                 content = self.formatter.format_vtt(timeline)
+            elif settings.format == ExportFormat.ASS:
+                content = self.formatter.format_ass(timeline)
             else:
                 raise CaptionExportError(f"Export format {settings.format.value} is not fully implemented yet.")
                 

@@ -19,6 +19,7 @@ class CaptionWord:
     start_time: float
     end_time: float
     probability: float = 1.0
+    is_emphasized: bool = False
 
 @dataclass
 class CaptionSegment:

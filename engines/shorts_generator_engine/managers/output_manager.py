@@ -62,8 +62,43 @@ class OutputManager:
                                         dr.write(f"Reason: {ev.reason}\n")
                                 else:
                                     dr.write("None\n")
+                                    
+                                if hasattr(clip, "captions") and clip.captions:
+                                    dr.write(f"\nCaptions: Generated {len(clip.captions)} segments\n")
+                                    emph_words = sum(1 for cap in clip.captions for w in cap.words if getattr(w, "is_emphasized", False))
+                                    dr.write(f"Emphasized Words: {emph_words}\n")
+                                else:
+                                    dr.write("Captions: None (No speech or failed transcription)\n")
+                                    
                                 dr.write("-" * 50 + "\n\n")
                                 
+                                # Generate ASS file for the clip if it has captions
+                                clip_ass_path = None
+                                if hasattr(clip, "captions") and clip.captions:
+                                    clip_ass_path = proj.premiere_project_path.parent / f"clip_{i}_caps.ass"
+                                    # We can mock a Timeline to use the formatter
+                                    from core.models.caption_models import CaptionTimeline
+                                    from engines.caption_engine.export.caption_formatter import CaptionFormatter
+                                    
+                                    mock_timeline = CaptionTimeline(video_id=f"clip_{i}", segments=clip.captions)
+                                    mock_timeline.preset_name = proj.settings.editing_style # Pass down editing style
+                                    
+                                    formatter = CaptionFormatter()
+                                    ass_content = formatter.format_ass(mock_timeline)
+                                    
+                                    with open(clip_ass_path, "w", encoding="utf-8") as f_ass:
+                                        f_ass.write(ass_content)
+                                        
+                                    # We need to escape the path for FFmpeg filter on Windows
+                                    # Windows paths need backslashes escaped and colons escaped, or just forward slashes
+                                    escaped_ass_path = str(clip_ass_path.absolute()).replace('\\', '/').replace(':', '\\:')
+                                    
+                                    ass_filter = f"ass='{escaped_ass_path}'"
+                                    if vf_str:
+                                        vf_str = f"{vf_str},{ass_filter}"
+                                    else:
+                                        vf_str = ass_filter
+                                        
                                 segments = editing_engine.get_time_warp_segments(clip)
                                 
                                 for seg_idx, seg in enumerate(segments):
