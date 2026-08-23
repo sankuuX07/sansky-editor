@@ -39,7 +39,9 @@ class HighlightSelectionManager:
                 source_video=video_path,
                 start_time=c.start_time,
                 end_time=c.end_time,
-                score=score_val
+                score=score_val,
+                semantic_type=c.semantic_type,
+                events_contained=c.events_contained
             ))
             
         return clips

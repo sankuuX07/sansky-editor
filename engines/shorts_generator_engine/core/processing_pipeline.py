@@ -37,6 +37,13 @@ class ProcessingPipeline:
                 raw_highlights = wf_results.get("extract_highlights", {})
                 
                 clips = self.highlight_selector.select_highlights(raw_highlights, video_path, request.settings)
+                
+                # Apply M7 Editing Decisions
+                from engines.editing_engine.editing_engine import EditingEngine
+                editing_engine = EditingEngine()
+                editing_engine.initialize()
+                editing_engine.generate_editing_decisions(clips, request.settings)
+                
                 clips = self.caption_placer.assign_captions(clips, raw_captions)
                 
                 # Thumbnail Generation

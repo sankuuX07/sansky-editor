@@ -28,6 +28,12 @@ class OutputSettings:
     highlight_threshold: float = 0.7
     premiere_template: str = "default_vertical"
     output_directory: str = "./outputs"
+    auto_edit_enabled: bool = True
+    editing_style: str = "GAMING" # CLEAN, GAMING, CINEMATIC, INTENSE
+    zoom_intensity: str = "MEDIUM" # LIGHT, MEDIUM, STRONG
+    shake_intensity: str = "MEDIUM" # LIGHT, MEDIUM, STRONG
+    color_preset: str = "NATURAL" # NATURAL, VIBRANT, CINEMATIC, GAMING
+    transition_style: str = "CUT" # CUT, FADE, FLASH
 
 @dataclass
 class ProcessingRequest:
@@ -44,6 +50,9 @@ class GeneratedClip:
     score: float
     captions: List[Any] = field(default_factory=list)
     thumbnail_path: Optional[Path] = None
+    semantic_type: Optional[str] = None
+    events_contained: List[Any] = field(default_factory=list)
+    editing_timeline: Optional[Any] = None
 
 @dataclass
 class ClipStatistics:

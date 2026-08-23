@@ -32,23 +32,66 @@ class OutputManager:
                     engine_manager = container.resolve(EngineManager)
                     video_engine = engine_manager.get_engine("video_engine")
                     
+                    from engines.editing_engine.editing_engine import EditingEngine
+                    editing_engine = EditingEngine()
+                    
                     concat_list_path = proj.premiere_project_path.parent / "concat_list.txt"
                     clips_to_concat = []
                     
-                    with open(concat_list_path, "w", encoding="utf-8") as f:
-                        for i, clip in enumerate(proj.clips):
-                            clip_out = proj.premiere_project_path.parent / f"clip_{i}.mp4"
-                            # We use subprocess to cut since it's synchronous and simple
-                            cmd = [
-                                "ffmpeg", "-y", "-i", str(clip.source_video),
-                                "-ss", str(clip.start_time), "-to", str(clip.end_time),
-                                "-c:v", "libx264", "-c:a", "aac", str(clip_out)
-                            ]
-                            subprocess.run(cmd, capture_output=True, check=True)
-                            
-                            f.write(f"file '{clip_out.name}'\n")
-                            clips_to_concat.append(clip_out)
-                            
+                    debug_report_path = proj.premiere_project_path.parent / "editing_report.txt"
+                    
+                    with open(debug_report_path, "w", encoding="utf-8") as dr:
+                        dr.write(f"SANSKY AI EDITOR - M7 EDITING REPORT\n")
+                        dr.write("="*50 + "\n\n")
+                        
+                        with open(concat_list_path, "w", encoding="utf-8") as f:
+                            for i, clip in enumerate(proj.clips):
+                                clip_out = proj.premiere_project_path.parent / f"clip_{i}.mp4"
+                                
+                                dr.write(f"HIGHLIGHT #{i+1}\n")
+                                dr.write(f"Source: {int(clip.start_time//60):02d}:{int(clip.start_time%60):02d} -> {int(clip.end_time//60):02d}:{int(clip.end_time%60):02d}\n")
+                                dr.write(f"Editing Style: {proj.settings.editing_style}\n")
+                                dr.write("Editing Decisions:\n")
+                                
+                                vf_str, af_str = editing_engine.build_ffmpeg_filters(clip)
+                                
+                                if clip.editing_timeline and clip.editing_timeline.editing_events:
+                                    for ev in clip.editing_timeline.editing_events:
+                                        dr.write(f"\n{ev.start_time - clip.start_time:.1f}s\n")
+                                        dr.write(f"{ev.event_type}\n")
+                                        dr.write(f"Reason: {ev.reason}\n")
+                                else:
+                                    dr.write("None\n")
+                                dr.write("-" * 50 + "\n\n")
+                                
+                                cmd = [
+                                    "ffmpeg", "-y", "-i", str(clip.source_video),
+                                    "-ss", str(clip.start_time), "-to", str(clip.end_time)
+                                ]
+                                
+                                if vf_str:
+                                    cmd.extend(["-vf", vf_str])
+                                if af_str:
+                                    cmd.extend(["-af", af_str])
+                                    
+                                cmd.extend(["-c:v", "libx264", "-c:a", "aac", str(clip_out)])
+                                
+                                try:
+                                    subprocess.run(cmd, capture_output=True, check=True)
+                                except subprocess.CalledProcessError as err:
+                                    logger.warning(f"Failed to apply filters for clip {i}, falling back to simple cut. Error: {err.stderr}")
+                                    dr.write(f"WARNING: Filter generation failed for clip {i}. Fallback: Render without effects.\n")
+                                    # Fallback simple cut
+                                    fallback_cmd = [
+                                        "ffmpeg", "-y", "-i", str(clip.source_video),
+                                        "-ss", str(clip.start_time), "-to", str(clip.end_time),
+                                        "-c:v", "libx264", "-c:a", "aac", str(clip_out)
+                                    ]
+                                    subprocess.run(fallback_cmd, capture_output=True, check=True)
+                                
+                                f.write(f"file '{clip_out.name}'\n")
+                                clips_to_concat.append(clip_out)
+                                
                     final_out = proj.premiere_project_path.parent / "output.mp4"
                     cmd_concat = [
                         "ffmpeg", "-y", "-f", "concat", "-safe", "0",
