@@ -29,7 +29,7 @@ class EditingDecisionEngine:
             # Map events to editing decisions
             ev_type = getattr(ev, "event_type", "")
             
-            # ELIMINATION / KNOCK popup -> SHAKE + IMPACT
+            # ELIMINATION / KNOCK popup -> SHAKE + IMPACT + FREEZE FRAME
             if ev_type == "gameplay_visual_evidence" and getattr(ev, "evidence_type", "") == "knock_popup_activity":
                 if style in ["GAMING", "INTENSE"]:
                     timeline.editing_events.append(EditingEvent(
@@ -46,6 +46,14 @@ class EditingDecisionEngine:
                         intensity=1.0,
                         reason="Elimination visual emphasis"
                     ))
+                if style in ["INTENSE", "CINEMATIC"]:
+                    timeline.editing_events.append(EditingEvent(
+                        event_type=EditingEventType.FREEZE_FRAME.value,
+                        start_time=ev.start_time,
+                        end_time=ev.start_time + 0.5,
+                        intensity=1.0,
+                        reason="Freeze frame for elimination"
+                    ))
                     
             # CLUTCH / KILL Speech -> SLOW MOTION
             elif ev_type == "speech_keyword":
@@ -60,7 +68,7 @@ class EditingDecisionEngine:
                             reason=f"Important speech: {text}"
                         ))
                         
-            # HIGH MOTION / FIGHT START -> ZOOM
+            # HIGH MOTION / FIGHT START -> ZOOM + SPEED_RAMP
             elif ev_type == "high_motion":
                 if style in ["GAMING", "CINEMATIC", "INTENSE"]:
                     # Ensure we don't overlap zooms too heavily
@@ -70,6 +78,14 @@ class EditingDecisionEngine:
                         end_time=ev.end_time + 1.0,
                         intensity=1.0 + (0.1 * z_intensity),
                         reason="Action sequence starting"
+                    ))
+                if style in ["INTENSE", "GAMING"]:
+                    timeline.editing_events.append(EditingEvent(
+                        event_type=EditingEventType.SPEED_RAMP.value,
+                        start_time=max(clip.start_time, ev.start_time - 1.0),
+                        end_time=ev.start_time,
+                        intensity=2.0, # 2x speed for buildup
+                        reason="Fast buildup to action"
                     ))
         
         # Deduplicate or resolve overlapping events

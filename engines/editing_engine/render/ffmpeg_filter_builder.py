@@ -41,15 +41,16 @@ class FFmpegFilterBuilder:
                 vf = f"crop=iw-{intensity*2}:ih-{intensity*2}:(iw-out_w)/2+((sin(t*20)*{intensity})):(ih-out_h)/2+((cos(t*15)*{intensity})):enable='between(t,{rel_start},{rel_end})',scale=iw*1.0:ih*1.0"
                 video_filters.append(vf)
                 
-            elif ev.event_type == EditingEventType.SLOW_MOTION.value:
-                # Slow motion uses setpts for video and atempo for audio.
-                # Applying setpts dynamically using timeline is complex without splitting the stream.
-                # For this modular engine, we will apply it using a trick if possible, or skip if it's too risky for a single pass.
-                # Due to FFmpeg limitations on timeline editing for setpts/atempo, we will apply a slight visual indicator (e.g. color shift) if we can't do actual slowmo easily, OR we skip it.
-                # A robust single-pass slow-motion requires splitting. Since the prompt says "Fall back gracefully if high-quality interpolation is unavailable", we'll just log it.
-                logger.info(f"Slow motion requested from {rel_start} to {rel_end}. Requires multi-pass or complex filtergraph. Applying visual emphasis instead.")
-                vf = f"colorbalance=rs=0.2:bs=0.2:enable='between(t,{rel_start},{rel_end})'"
-                video_filters.append(vf)
+                # We don't apply slow motion here anymore, it's handled via segments
+                pass
+                
+            elif ev.event_type == EditingEventType.SPEED_RAMP.value:
+                # Speed ramp handled via segments
+                pass
+                
+            elif ev.event_type == EditingEventType.FREEZE_FRAME.value:
+                # Freeze frame handled via segments
+                pass
                 
             elif ev.event_type == EditingEventType.IMPACT.value:
                 # Short flash / brightness burst
@@ -66,3 +67,46 @@ class FFmpegFilterBuilder:
                     video_filters.append("eq=saturation=1.3:contrast=1.2:brightness=0.05")
                     
         return video_filters, audio_filters
+
+    def get_time_warp_segments(self, timeline: EditingTimeline, clip_start: float, clip_end: float) -> List[Dict[str, Any]]:
+        """
+        Returns a list of dictionaries defining how to slice the clip into micro-segments.
+        Each dict has: {'start': float, 'end': float, 'type': str, 'speed': float}
+        """
+        warp_events = []
+        for ev in timeline.editing_events:
+            if ev.event_type in [EditingEventType.SLOW_MOTION.value, EditingEventType.SPEED_RAMP.value, EditingEventType.FREEZE_FRAME.value]:
+                warp_events.append(ev)
+                
+        if not warp_events:
+            return [{'start': clip_start, 'end': clip_end, 'type': 'NORMAL', 'speed': 1.0}]
+            
+        warp_events.sort(key=lambda x: x.start_time)
+        
+        segments = []
+        current_time = clip_start
+        
+        for ev in warp_events:
+            ev_start = max(clip_start, ev.start_time)
+            ev_end = min(clip_end, ev.end_time)
+            
+            if ev_start > current_time:
+                # Normal segment before the warp
+                segments.append({'start': current_time, 'end': ev_start, 'type': 'NORMAL', 'speed': 1.0})
+                
+            if ev_start < ev_end:
+                speed = 1.0
+                if ev.event_type == EditingEventType.SLOW_MOTION.value:
+                    speed = 0.5
+                elif ev.event_type == EditingEventType.SPEED_RAMP.value:
+                    speed = 2.0
+                elif ev.event_type == EditingEventType.FREEZE_FRAME.value:
+                    speed = 0.01 # Extremely slow for freeze frame effect
+                    
+                segments.append({'start': ev_start, 'end': ev_end, 'type': ev.event_type, 'speed': speed})
+                current_time = ev_end
+                
+        if current_time < clip_end:
+            segments.append({'start': current_time, 'end': clip_end, 'type': 'NORMAL', 'speed': 1.0})
+            
+        return segments

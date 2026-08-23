@@ -60,3 +60,9 @@ class EditingEngine(BaseEngine):
         af_str = ",".join(af_list) if af_list else ""
         
         return vf_str, af_str
+        
+    def get_time_warp_segments(self, clip: GeneratedClip) -> List[Dict]:
+        """Returns time warp segments for segmented rendering."""
+        if not clip.editing_timeline:
+            return [{'start': clip.start_time, 'end': clip.end_time, 'type': 'NORMAL', 'speed': 1.0}]
+        return self.filter_builder.get_time_warp_segments(clip.editing_timeline, clip.start_time, clip.end_time)

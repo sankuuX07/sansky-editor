@@ -64,33 +64,72 @@ class OutputManager:
                                     dr.write("None\n")
                                 dr.write("-" * 50 + "\n\n")
                                 
-                                cmd = [
-                                    "ffmpeg", "-y", "-i", str(clip.source_video),
-                                    "-ss", str(clip.start_time), "-to", str(clip.end_time)
-                                ]
+                                segments = editing_engine.get_time_warp_segments(clip)
                                 
-                                if vf_str:
-                                    cmd.extend(["-vf", vf_str])
-                                if af_str:
-                                    cmd.extend(["-af", af_str])
+                                for seg_idx, seg in enumerate(segments):
+                                    seg_out = proj.premiere_project_path.parent / f"clip_{i}_seg_{seg_idx}.mp4"
                                     
-                                cmd.extend(["-c:v", "libx264", "-c:a", "aac", str(clip_out)])
-                                
-                                try:
-                                    subprocess.run(cmd, capture_output=True, check=True)
-                                except subprocess.CalledProcessError as err:
-                                    logger.warning(f"Failed to apply filters for clip {i}, falling back to simple cut. Error: {err.stderr}")
-                                    dr.write(f"WARNING: Filter generation failed for clip {i}. Fallback: Render without effects.\n")
-                                    # Fallback simple cut
-                                    fallback_cmd = [
+                                    cmd = [
                                         "ffmpeg", "-y", "-i", str(clip.source_video),
-                                        "-ss", str(clip.start_time), "-to", str(clip.end_time),
-                                        "-c:v", "libx264", "-c:a", "aac", str(clip_out)
+                                        "-ss", str(seg['start']), "-to", str(seg['end'])
                                     ]
-                                    subprocess.run(fallback_cmd, capture_output=True, check=True)
+                                    
+                                    seg_vf_str = vf_str
+                                    seg_af_str = af_str
+                                    
+                                    if seg['speed'] != 1.0:
+                                        # Apply setpts and atempo
+                                        speed = seg['speed']
+                                        pts_mult = 1.0 / speed
+                                        
+                                        time_vf = f"setpts={pts_mult}*PTS"
+                                        time_af = f"atempo={speed}"
+                                        
+                                        if seg_vf_str:
+                                            seg_vf_str = f"{seg_vf_str},{time_vf}"
+                                        else:
+                                            seg_vf_str = time_vf
+                                            
+                                        if seg_af_str:
+                                            seg_af_str = f"{seg_af_str},{time_af}"
+                                        else:
+                                            seg_af_str = time_af
+                                            
+                                        dr.write(f"Segment {seg_idx} ({seg['start']:.1f}-{seg['end']:.1f}): Time warp {speed}x\n")
+                                        
+                                    if seg_vf_str:
+                                        cmd.extend(["-vf", seg_vf_str])
+                                    if seg_af_str:
+                                        cmd.extend(["-af", seg_af_str])
+                                        
+                                    cmd.extend(["-c:v", "libx264", "-c:a", "aac", str(seg_out)])
+                                    
+                                    try:
+                                        subprocess.run(cmd, capture_output=True, check=True)
+                                    except subprocess.CalledProcessError as err:
+                                        logger.warning(f"Failed to apply filters for clip {i} seg {seg_idx}. Error: {err.stderr}")
+                                        fallback_cmd = [
+                                            "ffmpeg", "-y", "-i", str(clip.source_video),
+                                            "-ss", str(seg['start']), "-to", str(seg['end']),
+                                            "-c:v", "libx264", "-c:a", "aac", str(seg_out)
+                                        ]
+                                        subprocess.run(fallback_cmd, capture_output=True, check=True)
+                                    
+                                    f.write(f"file '{seg_out.name}'\n")
+                                    clips_to_concat.append(seg_out)
                                 
-                                f.write(f"file '{clip_out.name}'\n")
-                                clips_to_concat.append(clip_out)
+                                # Apply transitions between clips
+                                if i < len(proj.clips) - 1:
+                                    if proj.settings.transition_style == "FLASH":
+                                        flash_out = proj.premiere_project_path.parent / f"trans_flash_{i}.mp4"
+                                        flash_cmd = [
+                                            "ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=white:s=1080x1920:d=0.2",
+                                            "-f", "lavfi", "-i", "anullsrc=d=0.2",
+                                            "-c:v", "libx264", "-c:a", "aac", str(flash_out)
+                                        ]
+                                        subprocess.run(flash_cmd, capture_output=True, check=True)
+                                        f.write(f"file '{flash_out.name}'\n")
+                                        clips_to_concat.append(flash_out)
                                 
                     final_out = proj.premiere_project_path.parent / "output.mp4"
                     cmd_concat = [
