@@ -35,9 +35,18 @@ class ShortsGenerationWorker(QThread):
             def is_cancelled_cb() -> bool:
                 return self._is_cancelled
                 
+            from core.models.batch_models import BatchJob, SingleJob
+            from engines.batch_engine.batch_engine import BatchProcessingEngine
+            
+            batch = BatchJob()
+            for vp in self.video_paths:
+                batch.jobs.append(SingleJob(video_path=vp))
+                
+            batch_engine = BatchProcessingEngine(self.shorts_engine)
+                
             self._future = asyncio.run_coroutine_threadsafe(
-                self.shorts_engine.generate_shorts(
-                    self.video_paths, 
+                batch_engine.process_batch(
+                    batch, 
                     self.settings,
                     progress_callback=progress_cb,
                     is_cancelled_callback=is_cancelled_cb

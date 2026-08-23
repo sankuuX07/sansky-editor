@@ -164,8 +164,18 @@ class ResultsPage(BasePage):
         self.scroll.setWidget(self.scroll_content)
         self.content_layout.addWidget(self.scroll)
         
-    def display_result(self, result):
-        self.result = result
+    def display_result(self, batch):
+        from core.models.batch_models import BatchJob
+        if not isinstance(batch, BatchJob):
+            # Backwards compatibility if somehow a raw result gets here
+            job = BatchJob()
+            from core.models.batch_models import SingleJob
+            sj = SingleJob(video_path="Unknown")
+            sj.result = batch
+            job.jobs = [sj]
+            batch = job
+
+        self.result = batch
         
         # Clear existing cards
         for i in reversed(range(self.scroll_layout.count())):
@@ -175,7 +185,7 @@ class ResultsPage(BasePage):
                 self.scroll_layout.takeAt(i)
                 widget.deleteLater()
                 
-        if not result or not result.projects:
+        if not batch or not batch.jobs:
             self.empty_widget.show()
             if self.scroll_layout.indexOf(self.empty_widget) == -1:
                 self.scroll_layout.insertWidget(0, self.empty_widget)
@@ -184,92 +194,108 @@ class ResultsPage(BasePage):
         self.empty_widget.hide()
         
         # Add summary header
-        summary = QLabel(f"Generated {sum(len(p.clips) for p in result.projects)} sequences successfully.")
+        summary_text = f"Batch Completed: {batch.completed_jobs} successful, {batch.failed_jobs} failed out of {batch.total_jobs} total."
+        summary = QLabel(summary_text)
         summary.setProperty("class", "Subtitle")
-        summary.setStyleSheet("color: #2ECC71;")
+        if batch.failed_jobs == 0:
+            summary.setStyleSheet("color: #2ECC71;")
+        else:
+            summary.setStyleSheet("color: #F1C40F;")
         self.scroll_layout.insertWidget(0, summary)
         
-        # Add Pipeline Stage Statuses if present
-        if hasattr(result, "stage_statuses") and result.stage_statuses:
-            status_container = QWidget()
-            status_container.setStyleSheet("background-color: #1A1D24; border-radius: 8px; padding: 12px;")
-            status_layout = QVBoxLayout(status_container)
+        for job in batch.jobs:
+            if not job.result:
+                error_container = QWidget()
+                error_container.setStyleSheet("background-color: #331A1D; border-radius: 8px; padding: 12px; border: 1px solid #E74C3C;")
+                l = QVBoxLayout(error_container)
+                l.addWidget(QLabel(f"<b>Failed Job:</b> {getattr(job.video_path, 'name', str(job.video_path))}"))
+                l.addWidget(QLabel(f"Error: {job.error_message}"))
+                self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, error_container)
+                continue
+                
+            result = job.result
             
-            title = QLabel("PIPELINE STATUS")
-            title.setStyleSheet("color: #8C96A8; font-weight: bold; font-size: 11px;")
-            status_layout.addWidget(title)
+            # Add Pipeline Stage Statuses if present
+            if hasattr(result, "stage_statuses") and result.stage_statuses:
+                status_container = QWidget()
+                status_container.setStyleSheet("background-color: #1A1D24; border-radius: 8px; padding: 12px;")
+                status_layout = QVBoxLayout(status_container)
+                
+                title = QLabel(f"PIPELINE STATUS: {getattr(job.video_path, 'name', '')}")
+                title.setStyleSheet("color: #8C96A8; font-weight: bold; font-size: 11px;")
+                status_layout.addWidget(title)
+                
+                grid = QGridLayout()
+                grid.setSpacing(8)
+                row, col = 0, 0
+                for stage, state in result.stage_statuses.items():
+                    lbl_stage = QLabel(f"{stage}:")
+                    lbl_stage.setStyleSheet("color: #8C96A8; font-size: 12px;")
+                    lbl_state = QLabel(state)
+                    
+                    if "SUCCESS" in state or "COMPLETED" in state:
+                        lbl_state.setStyleSheet("color: #2ECC71; font-weight: bold; font-size: 12px;")
+                    elif "FAILED" in state:
+                        lbl_state.setStyleSheet("color: #E74C3C; font-weight: bold; font-size: 12px;")
+                    elif "SKIPPED" in state or "PARTIAL" in state:
+                        lbl_state.setStyleSheet("color: #F1C40F; font-weight: bold; font-size: 12px;")
+                    else:
+                        lbl_state.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px;")
+                        
+                    grid.addWidget(lbl_stage, row, col * 2)
+                    grid.addWidget(lbl_state, row, col * 2 + 1)
+                    
+                    col += 1
+                    if col > 1:
+                        col = 0
+                        row += 1
+                
+                status_layout.addLayout(grid)
+                self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, status_container)
             
-            grid = QGridLayout()
-            grid.setSpacing(8)
-            row, col = 0, 0
-            for stage, state in result.stage_statuses.items():
-                lbl_stage = QLabel(f"{stage}:")
-                lbl_stage.setStyleSheet("color: #8C96A8; font-size: 12px;")
-                lbl_state = QLabel(state)
-                
-                if "SUCCESS" in state or "COMPLETED" in state:
-                    lbl_state.setStyleSheet("color: #2ECC71; font-weight: bold; font-size: 12px;")
-                elif "FAILED" in state:
-                    lbl_state.setStyleSheet("color: #E74C3C; font-weight: bold; font-size: 12px;")
-                elif "SKIPPED" in state or "PARTIAL" in state:
-                    lbl_state.setStyleSheet("color: #F1C40F; font-weight: bold; font-size: 12px;")
-                else:
-                    lbl_state.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px;")
+            for project in result.projects:
+                if getattr(project, "creator_report", None):
+                    report = project.creator_report
                     
-                grid.addWidget(lbl_stage, row, col * 2)
-                grid.addWidget(lbl_state, row, col * 2 + 1)
-                
-                col += 1
-                if col > 1:
-                    col = 0
-                    row += 1
+                    insights_container = QWidget()
+                    insights_container.setStyleSheet("background-color: #171A22; border-radius: 8px; padding: 16px; margin-bottom: 16px;")
+                    insights_layout = QVBoxLayout(insights_container)
+                    insights_layout.setSpacing(12)
+                    
+                    header = QLabel("CREATOR INSIGHTS 📈")
+                    header.setStyleSheet("color: #F39C12; font-weight: bold; font-size: 14px;")
+                    insights_layout.addWidget(header)
+                    
+                    # Best Short
+                    if report.best_candidate_id:
+                        best_lbl = QLabel(f"<b>Best Candidate:</b> Clip {report.best_candidate_id.split('_')[-1] if '_' in report.best_candidate_id else report.best_candidate_id}")
+                        best_lbl.setStyleSheet("color: #FFFFFF; font-size: 13px;")
+                        best_reason = QLabel(f"<i>{report.best_candidate_reason}</i>")
+                        best_reason.setStyleSheet("color: #8C96A8; font-size: 12px; margin-bottom: 8px;")
+                        insights_layout.addWidget(best_lbl)
+                        insights_layout.addWidget(best_reason)
+                        
+                    # Platforms
+                    if report.platform_suitability:
+                        plat_text = "<b>Platform Fit:</b> " + ", ".join([p.platform for p in report.platform_suitability if p.suitable])
+                        plat_lbl = QLabel(plat_text)
+                        plat_lbl.setStyleSheet("color: #FFFFFF; font-size: 13px; margin-bottom: 8px;")
+                        insights_layout.addWidget(plat_lbl)
+                        
+                    # Titles
+                    if report.title_suggestions:
+                        title_lbl = QLabel(f"<b>Title Ideas:</b><br/>" + "<br/>".join([f"- {t}" for t in report.title_suggestions]))
+                        title_lbl.setStyleSheet("color: #FFFFFF; font-size: 13px; margin-bottom: 8px;")
+                        insights_layout.addWidget(title_lbl)
+                        
+                    # Tags
+                    if report.hashtags:
+                        tags_lbl = QLabel(f"<b>Tags:</b> {' '.join(report.hashtags)}")
+                        tags_lbl.setStyleSheet("color: #2ECC71; font-size: 13px;")
+                        insights_layout.addWidget(tags_lbl)
+                        
+                    self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, insights_container)
             
-            status_layout.addLayout(grid)
-            self.scroll_layout.insertWidget(1, status_container)
-        
-        for project in result.projects:
-            if getattr(project, "creator_report", None):
-                report = project.creator_report
-                
-                insights_container = QWidget()
-                insights_container.setStyleSheet("background-color: #171A22; border-radius: 8px; padding: 16px; margin-bottom: 16px;")
-                insights_layout = QVBoxLayout(insights_container)
-                insights_layout.setSpacing(12)
-                
-                header = QLabel("CREATOR INSIGHTS 📈")
-                header.setStyleSheet("color: #F39C12; font-weight: bold; font-size: 14px;")
-                insights_layout.addWidget(header)
-                
-                # Best Short
-                if report.best_candidate_id:
-                    best_lbl = QLabel(f"<b>Best Candidate:</b> Clip {report.best_candidate_id.split('_')[-1] if '_' in report.best_candidate_id else report.best_candidate_id}")
-                    best_lbl.setStyleSheet("color: #FFFFFF; font-size: 13px;")
-                    best_reason = QLabel(f"<i>{report.best_candidate_reason}</i>")
-                    best_reason.setStyleSheet("color: #8C96A8; font-size: 12px; margin-bottom: 8px;")
-                    insights_layout.addWidget(best_lbl)
-                    insights_layout.addWidget(best_reason)
-                    
-                # Platforms
-                if report.platform_suitability:
-                    plat_text = "<b>Platform Fit:</b> " + ", ".join([p.platform for p in report.platform_suitability if p.suitable])
-                    plat_lbl = QLabel(plat_text)
-                    plat_lbl.setStyleSheet("color: #FFFFFF; font-size: 13px; margin-bottom: 8px;")
-                    insights_layout.addWidget(plat_lbl)
-                    
-                # Titles
-                if report.title_suggestions:
-                    title_lbl = QLabel(f"<b>Title Ideas:</b><br/>" + "<br/>".join([f"- {t}" for t in report.title_suggestions]))
-                    title_lbl.setStyleSheet("color: #FFFFFF; font-size: 13px; margin-bottom: 8px;")
-                    insights_layout.addWidget(title_lbl)
-                    
-                # Tags
-                if report.hashtags:
-                    tags_lbl = QLabel(f"<b>Tags:</b> {' '.join(report.hashtags)}")
-                    tags_lbl.setStyleSheet("color: #2ECC71; font-size: 13px;")
-                    insights_layout.addWidget(tags_lbl)
-                    
-                self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, insights_container)
-        
-            for clip in project.clips:
-                card = ClipCard(clip, project.premiere_project_path, project.settings.output_directory)
-                self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, card)
+                for clip in project.clips:
+                    card = ClipCard(clip, project.premiere_project_path, project.settings.output_directory)
+                    self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, card)
