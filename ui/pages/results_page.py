@@ -58,8 +58,18 @@ class ClipCard(QFrame):
         open_folder_btn.setProperty("class", "SecondaryButton")
         open_folder_btn.clicked.connect(self._open_folder)
         
+        feedback_btn = QPushButton("Provide Feedback")
+        feedback_btn.setProperty("class", "SecondaryButton")
+        feedback_btn.setStyleSheet("background-color: #F39C12; color: #000; font-weight: bold; border-radius: 6px;")
+        
+        # Capture variables for lambda
+        clip_id = clip.clip_id
+        project_id = parent_project_id if 'parent_project_id' in locals() else "UNKNOWN"
+        feedback_btn.clicked.connect(lambda _, cid=clip_id, pid=project_id: self._open_feedback(cid, pid))
+        
         action_layout.addWidget(open_video_btn)
         action_layout.addWidget(open_folder_btn)
+        action_layout.addWidget(feedback_btn)
         action_layout.addStretch()
         
         layout.addWidget(self.thumbnail_lbl)
@@ -98,6 +108,18 @@ class ClipCard(QFrame):
             QDesktopServices.openUrl(QUrl.fromLocalFile(video_path))
         else:
             QMessageBox.warning(self, "Video Not Found", "No valid MP4 video file was generated. The Video Engine may have failed during rendering.")
+
+    def _open_feedback(self, clip_id, project_id):
+        from ui.widgets.feedback_dialog import FeedbackDialog
+        from engines.preference_engine.preference_engine import PreferenceEngine
+        
+        dialog = FeedbackDialog(clip_id, project_id, self)
+        if dialog.exec():
+            record = dialog.get_feedback_record()
+            engine = PreferenceEngine()
+            engine.initialize()
+            engine.submit_feedback(record)
+            QMessageBox.information(self, "Feedback Submitted", "Thank you! Your feedback has been recorded and will improve future edits.")
 
 class ResultsPage(BasePage):
     def __init__(self, parent=None):

@@ -43,6 +43,13 @@ class ProcessingPipeline:
             if not request.video_paths:
                 raise Exception("No video paths provided.")
                 
+            report_progress("Loading User Preferences...", 8)
+            from engines.preference_engine.preference_engine import PreferenceEngine
+            pref_engine = PreferenceEngine()
+            pref_engine.initialize()
+            request.settings = pref_engine.apply_preferences_to_settings(request.settings)
+
+                
             for video_path in request.video_paths:
                 check_cancelled()
                 report_progress(f"Starting Analysis for {video_path.name}", 10)
