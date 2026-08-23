@@ -36,6 +36,8 @@ class OutputSettings:
     transition_style: str = "CUT" # CUT, FADE, FLASH
     bgm_path: Optional[str] = None # Path to background music
     audio_preset: str = "GAMING" # CLEAN, GAMING, CINEMATIC, INTENSE
+    composition_style: str = "ACTION" # GAMEPLAY_FOCUS, CREATOR, ACTION, CLEAN
+    facecam_layout: str = "NONE" # NONE, GAMEPLAY_FOCUS, FACE_CAM_TOP, PICTURE_IN_PICTURE
 
 @dataclass
 class ProcessingRequest:

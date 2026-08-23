@@ -56,8 +56,31 @@ class OutputManager:
                                 dr.write(f"Editing Style: {proj.settings.editing_style}\n")
                                 dr.write("Editing Decisions:\n")
                                 
+                                # 1. M10 - Composition Engine (Crop & Layout)
+                                from engines.composition_engine.composition_engine import CompositionEngine
+                                comp_engine = CompositionEngine()
+                                comp_vf_str, comp_timeline = comp_engine.build_ffmpeg_filters(clip, proj.settings)
+                                
+                                # 2. M7 - Editing Engine (Zoom, Shake, Speed)
                                 vf_str, af_str = editing_engine.build_ffmpeg_filters(clip)
                                 
+                                # Prepend the composition filter so M7 zooms operate on the cropped frame seamlessly
+                                if comp_vf_str:
+                                    if vf_str:
+                                        vf_str = f"{comp_vf_str},{vf_str}"
+                                    else:
+                                        vf_str = comp_vf_str
+                                        
+                                # Write Composition Report
+                                dr.write("SHORTS COMPOSITION REPORT\n")
+                                dr.write(f"Target Aspect Ratio: {proj.settings.target_aspect_ratio}\n")
+                                dr.write(f"Output Resolution: {proj.settings.output_resolution}\n")
+                                dr.write(f"Composition Style: {proj.settings.composition_style}\n")
+                                for ev in comp_timeline.events:
+                                    dr.write(f"\nFocus Region: {ev.focus_region}\n")
+                                    dr.write(f"Reason: {ev.reason}\n")
+                                    dr.write(f"Fallback Used: {'YES' if ev.fallback_used else 'NO'}\n")
+                                dr.write("-" * 50 + "\n\n")
                                 # Track audio ducking based on captions
                                 has_speech = False
                                 if hasattr(clip, "captions") and clip.captions:
@@ -67,7 +90,7 @@ class OutputManager:
                                     dr.write(f"Emphasized Words: {emph_words}\n")
                                 else:
                                     dr.write("Captions: None (No speech or failed transcription)\n")
-                                
+                                    
                                 if clip.editing_timeline and clip.editing_timeline.editing_events:
                                     for ev in clip.editing_timeline.editing_events:
                                         dr.write(f"\n{ev.start_time - clip.start_time:.1f}s\n")
