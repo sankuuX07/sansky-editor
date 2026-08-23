@@ -269,5 +269,33 @@ class OutputManager:
                         if c.exists(): c.unlink()
                     if concat_list_path.exists(): concat_list_path.unlink()
                     
+                    # --- M11 THUMBNAIL ENGINE PASS ---
+                    try:
+                        from engines.thumbnail_engine.thumbnail_engine import ThumbnailEngine
+                        thumb_engine = ThumbnailEngine()
+                        thumb_engine.initialize()
+                        thumb_engine.start()
+                        
+                        # Generate thumbnail based on the highest scoring clip
+                        best_clip = max(proj.clips, key=lambda c: c.score) if proj.clips else None
+                        if best_clip:
+                            thumb_dir = proj.premiere_project_path.parent / "thumbnails"
+                            thumb_report = thumb_engine.generate_thumbnail(best_clip, proj.settings, thumb_dir)
+                            
+                            if thumb_report and thumb_report.final_path:
+                                with open(debug_report_path, "a", encoding="utf-8") as dr:
+                                    dr.write("THUMBNAIL REPORT\n")
+                                    dr.write("="*50 + "\n")
+                                    dr.write(f"Selected Timestamp: {thumb_report.selected_timestamp:.1f}s\n")
+                                    dr.write(f"Event Context: {thumb_report.event_context}\n")
+                                    dr.write(f"Candidate Frames Analyzed: {thumb_report.candidate_count}\n")
+                                    dr.write(f"Measured Sharpness: {thumb_report.sharpness_score:.2f}\n")
+                                    dr.write(f"Thumbnail Path: {thumb_report.final_path.name}\n")
+                                    dr.write("-" * 50 + "\n\n")
+                                    
+                        thumb_engine.shutdown()
+                    except Exception as te:
+                        logger.error(f"Thumbnail Engine processing failed: {te}")
+                        
                 except Exception as e:
                     logger.error(f"Failed to generate output video: {e}")

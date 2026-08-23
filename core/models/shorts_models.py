@@ -38,6 +38,9 @@ class OutputSettings:
     audio_preset: str = "GAMING" # CLEAN, GAMING, CINEMATIC, INTENSE
     composition_style: str = "ACTION" # GAMEPLAY_FOCUS, CREATOR, ACTION, CLEAN
     facecam_layout: str = "NONE" # NONE, GAMEPLAY_FOCUS, FACE_CAM_TOP, PICTURE_IN_PICTURE
+    thumbnail_text: Optional[str] = None # Text to overlay on thumbnail
+    thumbnail_style: str = "GAMING" # CLEAN, GAMING, INTENSE
+    thumbnail_aspect_ratio: str = "16:9" # 16:9, 9:16, 1:1
 
 @dataclass
 class ProcessingRequest:
