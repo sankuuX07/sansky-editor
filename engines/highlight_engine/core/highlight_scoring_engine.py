@@ -57,14 +57,19 @@ class HighlightScoringEngine:
                 engagement += density * 15.0
                 if "gameplay_visual_evidence" in unique_types:
                     engagement += 10.0 # UI evidence adds engagement trust
+            elif candidate.semantic_type == "ELIMINATION":
+                engagement += 10.0
                     
             # Penalties
             if candidate.semantic_type in ["DEAD_TIME", "TRAVEL", "LOOTING"]:
-                engagement = max(0.0, engagement - 50.0)
+                engagement = max(0.0, engagement - 80.0) # Stronger penalty for non-combat
+            elif candidate.semantic_type in ["LOW_ACTION", "HIGH_ACTION"]:
+                # High action without evidence shouldn't score too high
+                engagement = max(0.0, engagement - 30.0)
                 
             if duration > 45.0 and density < 0.2:
                 # Long boring clip
-                engagement = max(0.0, engagement - 30.0)
+                engagement = max(0.0, engagement - 50.0)
                 
             candidate.engagement_score = round(min(100.0, max(0.0, engagement)), 2)
             

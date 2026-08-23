@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class GameplayVisualAnalyzer:
     """Analyzes gameplay video for UI structural changes (e.g., kill feed, hit markers)."""
     
-    def __init__(self, sample_rate_fps: int = 3, threshold: float = 0.05):
+    def __init__(self, sample_rate_fps: int = 3, threshold: float = 0.08):
         self.sample_rate_fps = sample_rate_fps
         self.threshold = threshold
 

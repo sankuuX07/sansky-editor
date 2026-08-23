@@ -32,8 +32,8 @@ class HighlightValidator:
                 continue
                 
             from core.models.highlight_models import EventType
-            if c.semantic_type == EventType.DEAD_TIME.value:
-                logger.debug(f"Rejecting clip: Tagged as DEAD_TIME.")
+            if c.semantic_type in [EventType.DEAD_TIME.value, EventType.TRAVEL.value, EventType.LOOTING.value, EventType.LOW_ACTION.value]:
+                logger.debug(f"Rejecting clip: Tagged as {c.semantic_type}.")
                 continue
                 
             valid_candidates.append(c)

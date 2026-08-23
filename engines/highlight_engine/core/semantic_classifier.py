@@ -67,15 +67,20 @@ class SemanticClassifier:
                 candidate.confidence = 0.85
                 candidate.reason = "Visual/audio combat signals validated by gameplay evidence."
             elif has_combat_signals and event_density > 1.0:
-                # Still allow FIGHT if density is extremely high but no direct OCR/speech
-                candidate.semantic_type = EventType.FIGHT.value
+                # High activity but no confirmed UI/gameplay evidence
+                candidate.semantic_type = EventType.HIGH_ACTION.value
                 candidate.confidence = 0.70
-                candidate.reason = "Very high density of motion/audio overlap (weak evidence)."
+                candidate.reason = "Very high density of motion/audio overlap but lacking direct UI/speech evidence."
+            elif has_combat_signals:
+                # Combat signals but low density and no evidence
+                candidate.semantic_type = EventType.LOW_ACTION.value
+                candidate.confidence = 0.60
+                candidate.reason = "Low density combat signals without confirmed gameplay evidence."
             elif (has_motion and not has_audio) or (has_audio and not has_motion):
                 if duration > 10.0:
                     candidate.semantic_type = EventType.TRAVEL.value
                     candidate.confidence = 0.6
-                    candidate.reason = "Prolonged single-signal activity."
+                    candidate.reason = "Prolonged single-signal activity without combat overlap."
                 else:
                     candidate.semantic_type = EventType.DEAD_TIME.value
                     candidate.confidence = 0.9
