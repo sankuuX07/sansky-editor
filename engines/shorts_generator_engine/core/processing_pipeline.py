@@ -103,6 +103,20 @@ class ProcessingPipeline:
                 
                 result.projects.append(project)
                 
+                # Add Creator Intelligence / Content Strategy
+                report_progress("Generating Creator Insights...", 99)
+                try:
+                    from engines.creator_intelligence_engine.creator_intelligence_engine import CreatorIntelligenceEngine
+                    creator_engine = CreatorIntelligenceEngine()
+                    # Output Manager is called external to this pipeline loop, but 
+                    # we can analyze the project now because the clips, duration, and captions are all settled.
+                    # We pass the pref_engine.profile that was loaded earlier.
+                    project.creator_report = creator_engine.analyze_project(project, pref_engine.profile)
+                    result.stage_statuses["M14_CREATOR_INTELLIGENCE"] = "SUCCESS"
+                except Exception as e:
+                    logger.warning(f"Creator Intelligence failed: {e}")
+                    result.stage_statuses["M14_CREATOR_INTELLIGENCE"] = f"FAILED: {e}"
+                
             result.status = ProcessingStatus.COMPLETED
 
             

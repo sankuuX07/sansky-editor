@@ -228,6 +228,48 @@ class ResultsPage(BasePage):
             self.scroll_layout.insertWidget(1, status_container)
         
         for project in result.projects:
+            if getattr(project, "creator_report", None):
+                report = project.creator_report
+                
+                insights_container = QWidget()
+                insights_container.setStyleSheet("background-color: #171A22; border-radius: 8px; padding: 16px; margin-bottom: 16px;")
+                insights_layout = QVBoxLayout(insights_container)
+                insights_layout.setSpacing(12)
+                
+                header = QLabel("CREATOR INSIGHTS 📈")
+                header.setStyleSheet("color: #F39C12; font-weight: bold; font-size: 14px;")
+                insights_layout.addWidget(header)
+                
+                # Best Short
+                if report.best_candidate_id:
+                    best_lbl = QLabel(f"<b>Best Candidate:</b> Clip {report.best_candidate_id.split('_')[-1] if '_' in report.best_candidate_id else report.best_candidate_id}")
+                    best_lbl.setStyleSheet("color: #FFFFFF; font-size: 13px;")
+                    best_reason = QLabel(f"<i>{report.best_candidate_reason}</i>")
+                    best_reason.setStyleSheet("color: #8C96A8; font-size: 12px; margin-bottom: 8px;")
+                    insights_layout.addWidget(best_lbl)
+                    insights_layout.addWidget(best_reason)
+                    
+                # Platforms
+                if report.platform_suitability:
+                    plat_text = "<b>Platform Fit:</b> " + ", ".join([p.platform for p in report.platform_suitability if p.suitable])
+                    plat_lbl = QLabel(plat_text)
+                    plat_lbl.setStyleSheet("color: #FFFFFF; font-size: 13px; margin-bottom: 8px;")
+                    insights_layout.addWidget(plat_lbl)
+                    
+                # Titles
+                if report.title_suggestions:
+                    title_lbl = QLabel(f"<b>Title Ideas:</b><br/>" + "<br/>".join([f"- {t}" for t in report.title_suggestions]))
+                    title_lbl.setStyleSheet("color: #FFFFFF; font-size: 13px; margin-bottom: 8px;")
+                    insights_layout.addWidget(title_lbl)
+                    
+                # Tags
+                if report.hashtags:
+                    tags_lbl = QLabel(f"<b>Tags:</b> {' '.join(report.hashtags)}")
+                    tags_lbl.setStyleSheet("color: #2ECC71; font-size: 13px;")
+                    insights_layout.addWidget(tags_lbl)
+                    
+                self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, insights_container)
+        
             for clip in project.clips:
                 card = ClipCard(clip, project.premiere_project_path, project.settings.output_directory)
                 self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, card)

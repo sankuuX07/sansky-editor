@@ -75,6 +75,7 @@ class ShortsProject:
     clips: List[GeneratedClip]
     settings: OutputSettings
     premiere_project_path: Optional[Path] = None
+    creator_report: Optional[Any] = None
 
 @dataclass
 class CaptionAssignment:
