@@ -47,6 +47,8 @@ class ProcessingRequest:
     video_paths: List[Path]
     settings: OutputSettings = field(default_factory=OutputSettings)
     request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    progress_callback: Optional[Any] = None # callable(msg: str, pct: int)
+    is_cancelled: Optional[Any] = None # callable() -> bool
 
 @dataclass
 class GeneratedClip:
@@ -107,3 +109,4 @@ class ProcessingResult:
     projects: List[ShortsProject] = field(default_factory=list)
     report: Optional[ProjectReport] = None
     error: Optional[str] = None
+    stage_statuses: Dict[str, str] = field(default_factory=dict)

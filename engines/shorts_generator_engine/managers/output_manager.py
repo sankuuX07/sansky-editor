@@ -23,6 +23,14 @@ class OutputManager:
                 else:
                     proj.premiere_project_path.touch(exist_ok=True)
                     
+                if hasattr(proj, "_progress_callback") and proj._progress_callback:
+                    proj._progress_callback("Rendering Output Videos...", 80)
+                    
+                # Retrieve cancellation callback
+                is_cancelled = getattr(proj, "_is_cancelled", None)
+                if is_cancelled and is_cancelled():
+                    raise Exception("Workflow Cancelled by User")
+                    
                 # Generate real output video
                 try:
                     import subprocess
@@ -43,12 +51,17 @@ class OutputManager:
                     from core.models.audio_models import AudioTimeline, AudioEvent
                     audio_timeline = AudioTimeline(video_id=proj.project_id)
                     
+                    debug_report_path = proj.premiere_project_path.parent / "editing_report.txt"
+                    
                     with open(debug_report_path, "w", encoding="utf-8") as dr:
                         dr.write(f"SANSKY AI EDITOR - M7/M9 EDITING REPORT\n")
                         dr.write("="*50 + "\n\n")
                         
                         with open(concat_list_path, "w", encoding="utf-8") as f:
                             for i, clip in enumerate(proj.clips):
+                                if is_cancelled and is_cancelled():
+                                    raise Exception("Workflow Cancelled by User")
+                                    
                                 clip_out = proj.premiere_project_path.parent / f"clip_{i}.mp4"
                                 
                                 dr.write(f"HIGHLIGHT #{i+1}\n")
@@ -223,79 +236,121 @@ class OutputManager:
                                         clips_to_concat.append(flash_out)
                                         current_output_time += 0.2
                                 
-                    final_out = proj.premiere_project_path.parent / "output.mp4"
-                    cmd_concat = [
-                        "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-                        "-i", str(concat_list_path),
-                        "-c", "copy", str(final_out)
-                    ]
-                    subprocess.run(cmd_concat, capture_output=True, check=True)
-                    logger.info(f"Generated intermediate output video at {final_out}")
-                    
-                    # --- M9 AUDIO ENGINE PASS ---
-                    try:
-                        from engines.audio_engine.audio_engine import AudioEngine
-                        audio_engine = AudioEngine()
-                        audio_engine.initialize()
-                        audio_engine.start()
-                        
-                        mixed_out = proj.premiere_project_path.parent / "output_mixed.mp4"
-                        analysis = audio_engine.process_audio(final_out, mixed_out, audio_timeline, proj.settings)
-                        
-                        if mixed_out.exists():
-                            final_out.unlink()
-                            mixed_out.rename(final_out)
-                            logger.info(f"Generated final audio-mixed video at {final_out}")
+                            final_out = proj.premiere_project_path.parent / "output.mp4"
+                            cmd_concat = [
+                                "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                                "-i", str(concat_list_path),
+                                "-c", "copy", str(final_out)
+                            ]
+                            subprocess.run(cmd_concat, capture_output=True, check=True)
+                            logger.info(f"Generated intermediate output video at {final_out}")
                             
-                            with open(debug_report_path, "a", encoding="utf-8") as dr:
-                                dr.write("AUDIO MIX REPORT\n")
-                                dr.write("="*50 + "\n")
-                                dr.write(f"Source Audio: Present\n")
-                                dr.write(f"Integrated Loudness: {analysis.integrated_loudness} dB\n")
-                                dr.write(f"Peak Level: {analysis.peak_level} dB\n")
-                                dr.write(f"Background Music: {'YES' if proj.settings.bgm_path else 'NO'}\n")
-                                dr.write(f"Audio Preset: {proj.settings.audio_preset}\n")
-                                dr.write(f"Ducking Events: {sum(1 for e in audio_timeline.events if e.event_type == 'DUCKING')}\n")
-                                dr.write(f"Emphasis Events: {sum(1 for e in audio_timeline.events if e.event_type == 'EMPHASIS')}\n")
-                                dr.write(f"Silence Regions Detected: {len(analysis.silence_regions)}\n")
-                                dr.write("-" * 50 + "\n\n")
-                                
-                        audio_engine.shutdown()
-                    except Exception as ae:
-                        logger.error(f"Audio Engine processing failed, using intermediate output: {ae}")
-                        
-                    # Cleanup temp clips
-                    for c in clips_to_concat:
-                        if c.exists(): c.unlink()
-                    if concat_list_path.exists(): concat_list_path.unlink()
-                    
-                    # --- M11 THUMBNAIL ENGINE PASS ---
-                    try:
-                        from engines.thumbnail_engine.thumbnail_engine import ThumbnailEngine
-                        thumb_engine = ThumbnailEngine()
-                        thumb_engine.initialize()
-                        thumb_engine.start()
-                        
-                        # Generate thumbnail based on the highest scoring clip
-                        best_clip = max(proj.clips, key=lambda c: c.score) if proj.clips else None
-                        if best_clip:
-                            thumb_dir = proj.premiere_project_path.parent / "thumbnails"
-                            thumb_report = thumb_engine.generate_thumbnail(best_clip, proj.settings, thumb_dir)
-                            
-                            if thumb_report and thumb_report.final_path:
-                                with open(debug_report_path, "a", encoding="utf-8") as dr:
-                                    dr.write("THUMBNAIL REPORT\n")
-                                    dr.write("="*50 + "\n")
-                                    dr.write(f"Selected Timestamp: {thumb_report.selected_timestamp:.1f}s\n")
-                                    dr.write(f"Event Context: {thumb_report.event_context}\n")
-                                    dr.write(f"Candidate Frames Analyzed: {thumb_report.candidate_count}\n")
-                                    dr.write(f"Measured Sharpness: {thumb_report.sharpness_score:.2f}\n")
-                                    dr.write(f"Thumbnail Path: {thumb_report.final_path.name}\n")
-                                    dr.write("-" * 50 + "\n\n")
+                            # --- M9 AUDIO ENGINE PASS ---
+                            try:
+                                if hasattr(proj, "_progress_callback") and proj._progress_callback:
+                                    proj._progress_callback("Processing Audio...", 85)
                                     
-                        thumb_engine.shutdown()
-                    except Exception as te:
-                        logger.error(f"Thumbnail Engine processing failed: {te}")
-                        
+                                from engines.audio_engine.audio_engine import AudioEngine
+                                audio_engine = AudioEngine()
+                                audio_engine.initialize()
+                                audio_engine.start()
+                                
+                                mixed_out = proj.premiere_project_path.parent / "output_mixed.mp4"
+                                analysis = audio_engine.process_audio(final_out, mixed_out, audio_timeline, proj.settings)
+                                
+                                if mixed_out.exists():
+                                    final_out.unlink()
+                                    mixed_out.rename(final_out)
+                                    logger.info(f"Generated final audio-mixed video at {final_out}")
+                                    
+                                    with open(debug_report_path, "a", encoding="utf-8") as dr:
+                                        dr.write("AUDIO MIX REPORT\n")
+                                        dr.write("="*50 + "\n")
+                                        dr.write(f"Source Audio: Present\n")
+                                        dr.write(f"Integrated Loudness: {analysis.integrated_loudness} dB\n")
+                                        dr.write(f"Peak Level: {analysis.peak_level} dB\n")
+                                        dr.write(f"Background Music: {'YES' if proj.settings.bgm_path else 'NO'}\n")
+                                        dr.write(f"Audio Preset: {proj.settings.audio_preset}\n")
+                                        dr.write(f"Ducking Events: {sum(1 for e in audio_timeline.events if e.event_type == 'DUCKING')}\n")
+                                        dr.write(f"Emphasis Events: {sum(1 for e in audio_timeline.events if e.event_type == 'EMPHASIS')}\n")
+                                        dr.write(f"Silence Regions Detected: {len(analysis.silence_regions)}\n")
+                                        dr.write("-" * 50 + "\n\n")
+                                        
+                                audio_engine.shutdown()
+                            except Exception as ae:
+                                logger.error(f"Audio Engine processing failed, using intermediate output: {ae}")
+                                
+                            # Cleanup temp clips
+                            for c in clips_to_concat:
+                                if c.exists(): c.unlink()
+                            if concat_list_path.exists(): concat_list_path.unlink()
+                            
+                            # --- M11 THUMBNAIL ENGINE PASS ---
+                            try:
+                                if hasattr(proj, "_progress_callback") and proj._progress_callback:
+                                    proj._progress_callback("Generating Thumbnails...", 95)
+                                    
+                                from engines.thumbnail_engine.thumbnail_engine import ThumbnailEngine
+                                thumb_engine = ThumbnailEngine()
+                                thumb_engine.initialize()
+                                thumb_engine.start()
+                                
+                                # Generate thumbnail based on the highest scoring clip
+                                best_clip = max(proj.clips, key=lambda c: c.score) if proj.clips else None
+                                if best_clip:
+                                    thumb_dir = proj.premiere_project_path.parent / "thumbnails"
+                                    thumb_report = thumb_engine.generate_thumbnail(best_clip, proj.settings, thumb_dir)
+                                    
+                                    if thumb_report and thumb_report.final_path:
+                                        with open(debug_report_path, "a", encoding="utf-8") as dr:
+                                            dr.write("THUMBNAIL REPORT\n")
+                                            dr.write("="*50 + "\n")
+                                            dr.write(f"Selected Timestamp: {thumb_report.selected_timestamp:.1f}s\n")
+                                            dr.write(f"Event Context: {thumb_report.event_context}\n")
+                                            dr.write(f"Candidate Frames Analyzed: {thumb_report.candidate_count}\n")
+                                            dr.write(f"Measured Sharpness: {thumb_report.sharpness_score:.2f}\n")
+                                            dr.write(f"Thumbnail Path: {thumb_report.final_path.name}\n")
+                                            dr.write("-" * 50 + "\n\n")
+                                            
+                                thumb_engine.shutdown()
+                            except Exception as te:
+                                logger.error(f"Thumbnail Engine processing failed: {te}")
+                                
+                            # --- M12 OUTPUT VALIDATION ---
+                            if hasattr(proj, "_progress_callback") and proj._progress_callback:
+                                proj._progress_callback("Validating Output...", 98)
+                                
+                            video_valid = False
+                            thumbnail_valid = False
+                            
+                            if final_out.exists() and final_out.stat().st_size > 0:
+                                # Probe video to ensure it's playable
+                                probe_cmd = ["ffprobe", "-v", "error", "-show_streams", str(final_out)]
+                                try:
+                                    res = subprocess.run(probe_cmd, capture_output=True, text=True, check=True)
+                                    if "codec_type=video" in res.stdout:
+                                        video_valid = True
+                                except subprocess.CalledProcessError:
+                                    pass
+                                    
+                            thumb_file = None
+                            if 'thumb_report' in locals() and thumb_report and thumb_report.final_path:
+                                thumb_file = thumb_report.final_path
+                            elif 'thumb_dir' in locals() and thumb_dir and thumb_dir.exists():
+                                thumbs = list(thumb_dir.glob("*.jpg"))
+                                if thumbs:
+                                    thumb_file = thumbs[0]
+                                    
+                            if thumb_file and thumb_file.exists() and thumb_file.stat().st_size > 0:
+                                thumbnail_valid = True
+                                
+                            if video_valid and thumbnail_valid:
+                                result.stage_statuses["FINAL_OUTPUT"] = "SUCCESS"
+                            elif video_valid and not thumbnail_valid:
+                                result.stage_statuses["FINAL_OUTPUT"] = "PARTIAL SUCCESS (Thumbnail failed)"
+                            else:
+                                result.stage_statuses["FINAL_OUTPUT"] = "FAILED (Video validation failed)"
+                                
                 except Exception as e:
                     logger.error(f"Failed to generate output video: {e}")
+                    result.stage_statuses["FINAL_OUTPUT"] = f"FAILED: {e}"

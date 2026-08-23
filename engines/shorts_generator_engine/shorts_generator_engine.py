@@ -72,9 +72,11 @@ class ShortsGeneratorEngine(BaseEngine):
     def health_check(self) -> bool:
         return self._status == EngineStatus.RUNNING
         
-    async def generate_shorts(self, inputs: Union[str, Path, List[Union[str, Path]]], settings: OutputSettings = None) -> ProcessingResult:
+    async def generate_shorts(self, inputs: Union[str, Path, List[Union[str, Path]]], settings: OutputSettings = None, progress_callback=None, is_cancelled_callback=None) -> ProcessingResult:
         self.logger.info("Starting generate_shorts workflow.")
         request = self.input_manager.create_request(inputs, settings)
+        request.progress_callback = progress_callback
+        request.is_cancelled = is_cancelled_callback
         
         result = await self.pipeline.process(request)
         

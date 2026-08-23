@@ -167,6 +167,44 @@ class ResultsPage(BasePage):
         summary.setStyleSheet("color: #2ECC71;")
         self.scroll_layout.insertWidget(0, summary)
         
+        # Add Pipeline Stage Statuses if present
+        if hasattr(result, "stage_statuses") and result.stage_statuses:
+            status_container = QWidget()
+            status_container.setStyleSheet("background-color: #1A1D24; border-radius: 8px; padding: 12px;")
+            status_layout = QVBoxLayout(status_container)
+            
+            title = QLabel("PIPELINE STATUS")
+            title.setStyleSheet("color: #8C96A8; font-weight: bold; font-size: 11px;")
+            status_layout.addWidget(title)
+            
+            grid = QGridLayout()
+            grid.setSpacing(8)
+            row, col = 0, 0
+            for stage, state in result.stage_statuses.items():
+                lbl_stage = QLabel(f"{stage}:")
+                lbl_stage.setStyleSheet("color: #8C96A8; font-size: 12px;")
+                lbl_state = QLabel(state)
+                
+                if "SUCCESS" in state or "COMPLETED" in state:
+                    lbl_state.setStyleSheet("color: #2ECC71; font-weight: bold; font-size: 12px;")
+                elif "FAILED" in state:
+                    lbl_state.setStyleSheet("color: #E74C3C; font-weight: bold; font-size: 12px;")
+                elif "SKIPPED" in state or "PARTIAL" in state:
+                    lbl_state.setStyleSheet("color: #F1C40F; font-weight: bold; font-size: 12px;")
+                else:
+                    lbl_state.setStyleSheet("color: #FFFFFF; font-weight: bold; font-size: 12px;")
+                    
+                grid.addWidget(lbl_stage, row, col * 2)
+                grid.addWidget(lbl_state, row, col * 2 + 1)
+                
+                col += 1
+                if col > 1:
+                    col = 0
+                    row += 1
+            
+            status_layout.addLayout(grid)
+            self.scroll_layout.insertWidget(1, status_container)
+        
         for project in result.projects:
             for clip in project.clips:
                 card = ClipCard(clip, project.premiere_project_path, project.settings.output_directory)

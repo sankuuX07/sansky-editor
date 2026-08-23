@@ -28,8 +28,20 @@ class ShortsGenerationWorker(QThread):
         try:
             self.progress_updated.emit("Submitting workflow to background thread...", 5)
             
+            # Helper callbacks
+            def progress_cb(msg: str, pct: int):
+                self.progress_updated.emit(msg, pct)
+                
+            def is_cancelled_cb() -> bool:
+                return self._is_cancelled
+                
             self._future = asyncio.run_coroutine_threadsafe(
-                self.shorts_engine.generate_shorts(self.video_paths, self.settings),
+                self.shorts_engine.generate_shorts(
+                    self.video_paths, 
+                    self.settings,
+                    progress_callback=progress_cb,
+                    is_cancelled_callback=is_cancelled_cb
+                ),
                 self.backend_loop
             )
             

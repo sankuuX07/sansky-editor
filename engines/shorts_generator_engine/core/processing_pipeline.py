@@ -29,43 +29,59 @@ class ProcessingPipeline:
     async def process(self, request: ProcessingRequest) -> ProcessingResult:
         result = ProcessingResult(request_id=request.request_id, status=ProcessingStatus.ANALYZING)
         
+        def report_progress(msg, pct):
+            if request.progress_callback:
+                request.progress_callback(msg, pct)
+                
+        def check_cancelled():
+            if request.is_cancelled and request.is_cancelled():
+                raise Exception("Workflow Cancelled by User")
+        
         try:
+            report_progress("Validating Configuration...", 5)
+            # Configuration Validation
+            if not request.video_paths:
+                raise Exception("No video paths provided.")
+                
             for video_path in request.video_paths:
+                check_cancelled()
+                report_progress(f"Starting Analysis for {video_path.name}", 10)
+                
+                result.stage_statuses["M6_ANALYSIS"] = "RUNNING"
                 wf_results = await self.launcher.launch_for_video(request, video_path)
+                result.stage_statuses["M6_ANALYSIS"] = "COMPLETED"
+                
+                check_cancelled()
+                report_progress("Selecting Highlights...", 30)
                 
                 raw_captions = wf_results.get("generate_captions", {})
                 raw_highlights = wf_results.get("extract_highlights", {})
                 
                 clips = self.highlight_selector.select_highlights(raw_highlights, video_path, request.settings)
                 
+                check_cancelled()
+                report_progress("Creating Editing Timeline...", 50)
+                
                 # Apply M7 Editing Decisions
+                result.stage_statuses["M7_EDITING"] = "RUNNING"
                 from engines.editing_engine.editing_engine import EditingEngine
                 editing_engine = EditingEngine()
                 editing_engine.initialize()
                 editing_engine.generate_editing_decisions(clips, request.settings)
+                result.stage_statuses["M7_EDITING"] = "COMPLETED"
                 
-                clips = self.caption_placer.assign_captions(clips, raw_captions)
+                check_cancelled()
+                report_progress("Assigning Captions...", 60)
                 
-                # Thumbnail Generation
-                try:
-                    from core.dependency_injection.container import container
-                    from app.services.engine_manager import EngineManager
-                    engine_manager = container.resolve(EngineManager)
-                    video_engine = engine_manager.get_engine("video_engine")
-                    
-                    from pathlib import Path
-                    out_dir = Path(request.settings.output_directory)
-                    out_dir.mkdir(parents=True, exist_ok=True)
-                    
-                    for clip in clips:
-                        thumb_path = out_dir / f"{clip.clip_id}_thumb.jpg"
-                        # Extract a single frame near the start of the clip
-                        target_ts = clip.start_time + 1.0 if clip.end_time - clip.start_time > 1.0 else clip.start_time
-                        video_engine.frame_extractor.extract_single_frame(clip.source_video, target_ts, thumb_path)
-                        clip.thumbnail_path = thumb_path
-                except Exception as thumb_err:
-                    logger.warning(f"Failed to generate thumbnails: {thumb_err}")
-
+                result.stage_statuses["M8_CAPTIONS"] = "RUNNING"
+                if raw_captions:
+                    clips = self.caption_placer.assign_captions(clips, raw_captions)
+                    result.stage_statuses["M8_CAPTIONS"] = "COMPLETED"
+                else:
+                    result.stage_statuses["M8_CAPTIONS"] = "SKIPPED (No speech detected)"
+                
+                check_cancelled()
+                report_progress("Preparing Project Assembly...", 70)
                 timeline = self.timeline_prep.prepare_timeline(clips, request.settings)
                 project = self.project_assembler.assemble(timeline, request.settings)
                 
@@ -74,9 +90,14 @@ class ProcessingPipeline:
                 if xml_data:
                     project._xml_data = xml_data
                 
+                # Attach request callbacks so OutputManager can use them
+                project._progress_callback = request.progress_callback
+                project._is_cancelled = request.is_cancelled
+                
                 result.projects.append(project)
                 
             result.status = ProcessingStatus.COMPLETED
+
             
         except Exception as e:
             logger.error(f"Pipeline failed: {e}")
