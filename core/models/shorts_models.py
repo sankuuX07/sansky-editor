@@ -34,6 +34,8 @@ class OutputSettings:
     shake_intensity: str = "MEDIUM" # LIGHT, MEDIUM, STRONG
     color_preset: str = "NATURAL" # NATURAL, VIBRANT, CINEMATIC, GAMING
     transition_style: str = "CUT" # CUT, FADE, FLASH
+    bgm_path: Optional[str] = None # Path to background music
+    audio_preset: str = "GAMING" # CLEAN, GAMING, CINEMATIC, INTENSE
 
 @dataclass
 class ProcessingRequest:

@@ -38,10 +38,13 @@ class OutputManager:
                     concat_list_path = proj.premiere_project_path.parent / "concat_list.txt"
                     clips_to_concat = []
                     
-                    debug_report_path = proj.premiere_project_path.parent / "editing_report.txt"
+                    # Track time for absolute audio timeline
+                    current_output_time = 0.0
+                    from core.models.audio_models import AudioTimeline, AudioEvent
+                    audio_timeline = AudioTimeline(video_id=proj.project_id)
                     
                     with open(debug_report_path, "w", encoding="utf-8") as dr:
-                        dr.write(f"SANSKY AI EDITOR - M7 EDITING REPORT\n")
+                        dr.write(f"SANSKY AI EDITOR - M7/M9 EDITING REPORT\n")
                         dr.write("="*50 + "\n\n")
                         
                         with open(concat_list_path, "w", encoding="utf-8") as f:
@@ -55,6 +58,16 @@ class OutputManager:
                                 
                                 vf_str, af_str = editing_engine.build_ffmpeg_filters(clip)
                                 
+                                # Track audio ducking based on captions
+                                has_speech = False
+                                if hasattr(clip, "captions") and clip.captions:
+                                    has_speech = True
+                                    dr.write(f"\nCaptions: Generated {len(clip.captions)} segments\n")
+                                    emph_words = sum(1 for cap in clip.captions for w in cap.words if getattr(w, "is_emphasized", False))
+                                    dr.write(f"Emphasized Words: {emph_words}\n")
+                                else:
+                                    dr.write("Captions: None (No speech or failed transcription)\n")
+                                
                                 if clip.editing_timeline and clip.editing_timeline.editing_events:
                                     for ev in clip.editing_timeline.editing_events:
                                         dr.write(f"\n{ev.start_time - clip.start_time:.1f}s\n")
@@ -62,13 +75,6 @@ class OutputManager:
                                         dr.write(f"Reason: {ev.reason}\n")
                                 else:
                                     dr.write("None\n")
-                                    
-                                if hasattr(clip, "captions") and clip.captions:
-                                    dr.write(f"\nCaptions: Generated {len(clip.captions)} segments\n")
-                                    emph_words = sum(1 for cap in clip.captions for w in cap.words if getattr(w, "is_emphasized", False))
-                                    dr.write(f"Emphasized Words: {emph_words}\n")
-                                else:
-                                    dr.write("Captions: None (No speech or failed transcription)\n")
                                     
                                 dr.write("-" * 50 + "\n\n")
                                 
@@ -90,7 +96,6 @@ class OutputManager:
                                         f_ass.write(ass_content)
                                         
                                     # We need to escape the path for FFmpeg filter on Windows
-                                    # Windows paths need backslashes escaped and colons escaped, or just forward slashes
                                     escaped_ass_path = str(clip_ass_path.absolute()).replace('\\', '/').replace(':', '\\:')
                                     
                                     ass_filter = f"ass='{escaped_ass_path}'"
@@ -100,6 +105,8 @@ class OutputManager:
                                         vf_str = ass_filter
                                         
                                 segments = editing_engine.get_time_warp_segments(clip)
+                                
+                                clip_start_abs = current_output_time
                                 
                                 for seg_idx, seg in enumerate(segments):
                                     seg_out = proj.premiere_project_path.parent / f"clip_{i}_seg_{seg_idx}.mp4"
@@ -112,10 +119,12 @@ class OutputManager:
                                     seg_vf_str = vf_str
                                     seg_af_str = af_str
                                     
+                                    seg_duration = seg['end'] - seg['start']
                                     if seg['speed'] != 1.0:
                                         # Apply setpts and atempo
                                         speed = seg['speed']
                                         pts_mult = 1.0 / speed
+                                        seg_duration = seg_duration * pts_mult
                                         
                                         time_vf = f"setpts={pts_mult}*PTS"
                                         time_af = f"atempo={speed}"
@@ -149,9 +158,33 @@ class OutputManager:
                                             "-c:v", "libx264", "-c:a", "aac", str(seg_out)
                                         ]
                                         subprocess.run(fallback_cmd, capture_output=True, check=True)
-                                    
+                                        
                                     f.write(f"file '{seg_out.name}'\n")
                                     clips_to_concat.append(seg_out)
+                                    current_output_time += seg_duration
+                                
+                                clip_end_abs = current_output_time
+                                
+                                # Add Audio Timeline Events for Ducking & Emphasis
+                                if has_speech:
+                                    audio_timeline.events.append(AudioEvent(
+                                        start_time=clip_start_abs,
+                                        end_time=clip_end_abs,
+                                        event_type='DUCKING',
+                                        target_volume=0.05,
+                                        reason="COMMENTARY"
+                                    ))
+                                
+                                if clip.events_contained:
+                                    has_action = any(e.event_type in ["gameplay_visual_evidence", "high_motion"] for e in clip.events_contained)
+                                    if has_action:
+                                        audio_timeline.events.append(AudioEvent(
+                                            start_time=clip_start_abs,
+                                            end_time=clip_end_abs,
+                                            event_type='EMPHASIS',
+                                            target_volume=1.5,
+                                            reason="ACTION"
+                                        ))
                                 
                                 # Apply transitions between clips
                                 if i < len(proj.clips) - 1:
@@ -165,6 +198,7 @@ class OutputManager:
                                         subprocess.run(flash_cmd, capture_output=True, check=True)
                                         f.write(f"file '{flash_out.name}'\n")
                                         clips_to_concat.append(flash_out)
+                                        current_output_time += 0.2
                                 
                     final_out = proj.premiere_project_path.parent / "output.mp4"
                     cmd_concat = [
@@ -173,8 +207,40 @@ class OutputManager:
                         "-c", "copy", str(final_out)
                     ]
                     subprocess.run(cmd_concat, capture_output=True, check=True)
-                    logger.info(f"Generated final output video at {final_out}")
+                    logger.info(f"Generated intermediate output video at {final_out}")
                     
+                    # --- M9 AUDIO ENGINE PASS ---
+                    try:
+                        from engines.audio_engine.audio_engine import AudioEngine
+                        audio_engine = AudioEngine()
+                        audio_engine.initialize()
+                        audio_engine.start()
+                        
+                        mixed_out = proj.premiere_project_path.parent / "output_mixed.mp4"
+                        analysis = audio_engine.process_audio(final_out, mixed_out, audio_timeline, proj.settings)
+                        
+                        if mixed_out.exists():
+                            final_out.unlink()
+                            mixed_out.rename(final_out)
+                            logger.info(f"Generated final audio-mixed video at {final_out}")
+                            
+                            with open(debug_report_path, "a", encoding="utf-8") as dr:
+                                dr.write("AUDIO MIX REPORT\n")
+                                dr.write("="*50 + "\n")
+                                dr.write(f"Source Audio: Present\n")
+                                dr.write(f"Integrated Loudness: {analysis.integrated_loudness} dB\n")
+                                dr.write(f"Peak Level: {analysis.peak_level} dB\n")
+                                dr.write(f"Background Music: {'YES' if proj.settings.bgm_path else 'NO'}\n")
+                                dr.write(f"Audio Preset: {proj.settings.audio_preset}\n")
+                                dr.write(f"Ducking Events: {sum(1 for e in audio_timeline.events if e.event_type == 'DUCKING')}\n")
+                                dr.write(f"Emphasis Events: {sum(1 for e in audio_timeline.events if e.event_type == 'EMPHASIS')}\n")
+                                dr.write(f"Silence Regions Detected: {len(analysis.silence_regions)}\n")
+                                dr.write("-" * 50 + "\n\n")
+                                
+                        audio_engine.shutdown()
+                    except Exception as ae:
+                        logger.error(f"Audio Engine processing failed, using intermediate output: {ae}")
+                        
                     # Cleanup temp clips
                     for c in clips_to_concat:
                         if c.exists(): c.unlink()
