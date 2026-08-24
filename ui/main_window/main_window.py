@@ -13,6 +13,7 @@ from ui.pages.results_page import ResultsPage
 from ui.pages.settings_page import SettingsPage
 from ui.pages.logs_page import LogsPage
 from ui.pages.about_page import AboutPage
+from ui.pages.editor_page import EditorPage
 
 from ui.controllers.backend_worker import ShortsGenerationWorker
 from ui.animations.fade_stacked_widget import FadeStackedWidget
@@ -72,7 +73,8 @@ class MainWindow(QMainWindow):
             "results": ResultsPage(),
             "settings": SettingsPage(),
             "logs": LogsPage(),
-            "about": AboutPage()
+            "about": AboutPage(),
+            "editor": EditorPage()
         }
         
         self.pages["library"].reedit_requested.connect(self.handle_reedit)
@@ -155,19 +157,7 @@ class MainWindow(QMainWindow):
         self.pages["logs"].append_log(level, msg)
 
     def handle_reedit(self, entry):
-        from pathlib import Path
-        import os
-        src = Path(entry.source_path)
-        if not src.exists():
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Missing Source", "The source video for this project is missing. Cannot re-edit.")
-            return
-            
-        # Add it to the media page queue
-        self.pages["media"].video_paths.clear()
-        self.pages["media"].process_new_files([str(src)])
-        self.navigate_to("media")
-        
-        # In a full implementation, we'd also load the previous settings from the old output folder
-        # (e.g. settings.json), but for now we just seed the media queue with the old file.
+        # M17 - Open in Smart Manual Editor
+        self.navigate_to("editor")
+        self.pages["editor"].load_project(entry)
 

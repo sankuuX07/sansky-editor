@@ -15,6 +15,21 @@ class OutputManager:
             if proj.premiere_project_path:
                 proj.premiere_project_path.parent.mkdir(parents=True, exist_ok=True)
                 
+                # Write project.json for M17 Smart Editor
+                import dataclasses
+                import json
+                try:
+                    def _default(o):
+                        if isinstance(o, Path): return str(o)
+                        if hasattr(o, 'value'): return o.value
+                        return str(o)
+                        
+                    project_json_path = proj.premiere_project_path.parent / "project.json"
+                    with open(project_json_path, 'w', encoding='utf-8') as f:
+                        json.dump(dataclasses.asdict(proj), f, default=_default, indent=2)
+                except Exception as e:
+                    logger.error(f"Failed to save project.json: {e}")
+                
                 # Write the XML if it was passed via context (we will inject it)
                 xml_data = getattr(proj, '_xml_data', None)
                 if xml_data:
