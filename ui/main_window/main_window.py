@@ -14,6 +14,7 @@ from ui.pages.settings_page import SettingsPage
 from ui.pages.logs_page import LogsPage
 from ui.pages.about_page import AboutPage
 from ui.pages.editor_page import EditorPage
+from ui.pages.publishing_page import PublishingPage
 
 from ui.controllers.backend_worker import ShortsGenerationWorker
 from ui.animations.fade_stacked_widget import FadeStackedWidget
@@ -74,10 +75,12 @@ class MainWindow(QMainWindow):
             "settings": SettingsPage(),
             "logs": LogsPage(),
             "about": AboutPage(),
-            "editor": EditorPage()
+            "editor": EditorPage(),
+            "publish": PublishingPage(backend_loop=backend_loop)
         }
         
         self.pages["library"].reedit_requested.connect(self.handle_reedit)
+        self.pages["library"].publish_requested.connect(self.handle_publish)
         
         self.pages["media"].generate_requested.connect(self.start_generation)
         self.pages["dashboard"].files_dropped.connect(self._on_dashboard_files_dropped)
@@ -160,4 +163,9 @@ class MainWindow(QMainWindow):
         # M17 - Open in Smart Manual Editor
         self.navigate_to("editor")
         self.pages["editor"].load_project(entry)
+        
+    def handle_publish(self, entry):
+        # M18 - Open in Creator Publishing Hub
+        self.navigate_to("publish")
+        self.pages["publish"].load_project(entry)
 

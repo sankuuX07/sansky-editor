@@ -87,6 +87,11 @@ class LibraryDetailsDialog(QDialog):
         reedit_btn.setProperty("class", "Secondary")
         reedit_btn.clicked.connect(lambda: self._emit_action("reedit"))
         
+        publish_btn = QPushButton("Publish")
+        publish_btn.setProperty("class", "Secondary")
+        publish_btn.setStyleSheet("background-color: #9B59B6;")
+        publish_btn.clicked.connect(lambda: self._emit_action("publish"))
+        
         fav_btn = QPushButton("Unfavorite" if self.entry.favorite else "Favorite")
         fav_btn.setProperty("class", "Secondary")
         fav_btn.clicked.connect(self._toggle_fav)
@@ -103,6 +108,7 @@ class LibraryDetailsDialog(QDialog):
         
         btn_layout.addWidget(open_btn)
         btn_layout.addWidget(reedit_btn)
+        btn_layout.addWidget(publish_btn)
         btn_layout.addWidget(fav_btn)
         btn_layout.addWidget(archive_btn)
         btn_layout.addWidget(delete_btn)

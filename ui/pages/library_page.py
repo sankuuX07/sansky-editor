@@ -11,6 +11,7 @@ class FlowLayout(QVBoxLayout):
 
 class LibraryPage(BasePage):
     reedit_requested = Signal(object) # pass the entry
+    publish_requested = Signal(object) # pass the entry
     
     def __init__(self, parent=None):
         super().__init__("Content Library", parent)
@@ -113,3 +114,5 @@ class LibraryPage(BasePage):
             self.refresh()
         elif action == "reedit":
             self.reedit_requested.emit(entry)
+        elif action == "publish":
+            self.publish_requested.emit(entry)
